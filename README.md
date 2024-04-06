@@ -1,2 +1,2 @@
 Packages used: 
-  PyQt5 (pip install PyQt5)
+  PyQt6 (pip install PyQt6)
