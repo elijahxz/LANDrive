@@ -7,7 +7,7 @@ __pycache__/
 *.so
 
 # Vim temp files
-*.swp
+*~
 
 # Distribution / packaging
 .Python
