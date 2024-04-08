@@ -37,9 +37,9 @@ REFRESH = "RefreshFiles"
 
 # QT Developer chose these. To change the screen, use we
 # self.ui.stackedWidget.setCurrentIndex(3)
+CONNECT_SCREEN = 0
 MAIN_SCREEN = 1
 EDIT_SCREEN = 2
-CONNECT_SCREEN = 0
 
 """ 
    The window is a wrapper class for Ui_MainWindow so we can interact with it. 
