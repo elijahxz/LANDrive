@@ -15,7 +15,6 @@ PORT = 8504
 MAX_USERS = 16
 # Random max size, may increase if needed
 MAX_SIZE = 16384
-PRINT_LOCK = threading.Lock()
 
 SERVER_ROOT_DIR = "\\FileDirectory"
 
@@ -23,6 +22,7 @@ SERVER_FILES = list()
 
 SERVER_TERMINATE = False
 
+mutex = threading.Lock()
 
 """ 
     Commands that can be requested from the client
@@ -59,7 +59,6 @@ def main():
             stdoutPrint("Client connected, client's address = %s" % (c_address,))
             sys.stdout.flush()
             
-            PRINT_LOCK.acquire()
             # Create a new thread to handle the client
             # This thread runs the client_handler function
             client_thread = threading.Thread(target=client_handler, args=(c_socket,))
@@ -94,27 +93,19 @@ def client_handler(c_socket):
         
         match buffer:
             case ResponseCode.CLOSE_CONNECTION:
-                PRINT_LOCK.release()
                 break # This breaks the while loop!
             # Send the files in the server's directory to the user
             case ResponseCode.REFRESH:
-                data = json.dumps(SERVER_FILES)
-                c_socket.sendall(bytes(data, encoding="utf-8"))
+                with mutex:
+                    data = json.dumps(SERVER_FILES)
+                    c_socket.sendall(bytes(data, encoding="utf-8"))
             case _:
                 stdoutPrint("An error has occured, %s is not a valid client request" 
                             % (buffer))
          
-
-
-
         stdoutPrint("Client message: %s" % (buffer))
         if (buffer == ResponseCode.CLOSE_CONNECTION):
-            PRINT_LOCK.release()
             break
-
-        # Send a response back to the client
-        response = "Hello from the server!"
-        c_socket.send(response.encode())
         
     # Close the connection with the client
     c_socket.close()
@@ -130,19 +121,23 @@ def getServerFiles():
     file_list = list()
     
     while not SERVER_TERMINATE: 
-        # Gets the path of this file, server.py. 
-        # FileDirectory/ should be at the same path 
-        server_py_path = os.path.dirname(os.path.realpath(__file__)) 
-        file_directory_path = server_py_path + SERVER_ROOT_DIR
-        
-        # Get all of the files unser FileDirectory\
-        for path, subdirs, files in os.walk(file_directory_path):
-            rel_path = path[path.find(SERVER_ROOT_DIR):]
-            current_dir = os.path.basename(rel_path)
-            for name in files:
-                file_list.append([os.path.join(rel_path, name),current_dir,name])
-        
-        SERVER_FILES = file_list
+        with mutex:
+            file_list = list()
+            # Gets the path of this file, server.py. 
+            # FileDirectory/ should be at the same path 
+            server_py_path = os.path.dirname(os.path.realpath(__file__)) 
+            file_directory_path = server_py_path + SERVER_ROOT_DIR
+            
+            # Get all of the files unser FileDirectory\
+            for path, subdirs, files in os.walk(file_directory_path):
+                rel_path = path[path.find(SERVER_ROOT_DIR):]
+                current_dir = os.path.basename(rel_path)
+                for name in files:
+                    file_list.append([os.path.join(rel_path, name), current_dir, name, False])
+                for subdir in subdirs: 
+                    file_list.append([os.path.join(rel_path, subdir), current_dir, subdir, True]) 
+            
+            SERVER_FILES = file_list
    
         # The corresponding thread will check and update the files 
         # Approx. every 10 seconds

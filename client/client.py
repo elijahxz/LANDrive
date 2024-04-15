@@ -2,6 +2,7 @@ import json
 import time
 import socket
 import sys
+from threading import Lock
 
 # Whew, thats alot.
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
@@ -32,6 +33,11 @@ PORT = 8504
 
 MAX_SIZE = 16384
 
+mutex = Lock()
+
+# Server's base directory
+BASE_DIR = "FileDirectory"
+
 CLOSE_CONNECTION = "TerminateTCPConnection"
 REFRESH = "RefreshFiles"
 
@@ -49,13 +55,17 @@ class Window(QMainWindow):
         super(Window, self).__init__(parent)
         # Used for connecting to the server 
         self.CONNECTING = False
+        
+        # Keep track of how far the user goes down the file tree
+        self.dir_stack = [BASE_DIR]
+        
+        self.files = list()
 
         self.THEMES = QStyleFactory.keys()
         self.current_theme = app.style().name()
 
         # Create a socket for the client
         self.c_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
 
         # Initialize the other class and set everything up
         self.ui = Ui_MainWindow()
@@ -74,7 +84,10 @@ class Window(QMainWindow):
     def setupUiFunctionality(self):
         self.ui.connect_button.clicked.connect(self.connectToServer)
         self.ui.disconnect_button.clicked.connect(self.disconnectFromServer)
-        
+        self.ui.back.clicked.connect(self.dirUp)
+
+        # Selecting a row calls an event handler
+        self.ui.tableWidget.doubleClicked.connect(self.dirDown)
 
     """ Called when the GUI is closed """
     def closeEvent(self, event):
@@ -159,25 +172,113 @@ class Window(QMainWindow):
     def displayMainScreen(self):
         # Hide connection and show the main widget
         self.ui.connect_label.setText("")
+       
+        self.dir_stack = [BASE_DIR]
+
+        self.fetchServerFiles()
+        
+        self.fillTable()
+
+        print("FILES = ", self.files) 
+
         self.ui.stackedWidget.setCurrentIndex(MAIN_SCREEN)
 
     def displayConnectScreen(self):
         self.ui.stackedWidget.setCurrentIndex(CONNECT_SCREEN)
-
+    
     def fetchServerFiles(self):
         self.c_socket.send("RefreshFiles".encode())
 
         data = self.c_socket.recv(MAX_SIZE)
         data = data.decode("utf-8")
+        
+        with mutex: 
+            self.files = json.loads(data)
+    
+    def clearTable(self):
+        while (self.ui.tableWidget.rowCount() > 0):
+            self.ui.tableWidget.removeRow(0)
+    
+    def fillTable(self):
+        row = 0
+        dir_files = list()
+        
+        self.clearTable()
+        
+        with mutex:
+            for file in self.files:
+                if file[1] == self.dir_stack[ ( len(self.dir_stack) - 1 ) ]:
+                    dir_files.append(file)
 
-        files = json.loads(data)
+        if len(dir_files) == 0:
+            self.ui.tableWidget.setRowCount(1)
+            one = QTableWidgetItem("No Files In Dir")
+            two = QTableWidgetItem("")
+            three = QTableWidgetItem("")
+            
+            # Makes the row not selectable/editable
+            one.setFlags( Qt.ItemIsSelectable |  Qt.ItemIsEnabled )
+            two.setFlags( Qt.ItemIsSelectable |  Qt.ItemIsEnabled )
+            three.setFlags( Qt.ItemIsSelectable |  Qt.ItemIsEnabled )
 
-        return files
+            self.ui.tableWidget.setItem(row, 0, one)         
+            self.ui.tableWidget.setItem(row, 1, two)         
+            self.ui.tableWidget.setItem(row, 2, three)
 
+        else:
+            self.ui.tableWidget.setRowCount(len(dir_files))
+            for file in dir_files:
+                type_ = "File"
+                if file[3] == True:
+                    type_ = "dir"
+                one = QTableWidgetItem(file[2])
+                two = QTableWidgetItem(file[1])
+                three = QTableWidgetItem(type_)
 
+                # Makes the row not selectable/editable
+                one.setFlags( Qt.ItemIsSelectable |  Qt.ItemIsEnabled )
+                two.setFlags( Qt.ItemIsSelectable |  Qt.ItemIsEnabled )
+                three.setFlags( Qt.ItemIsSelectable |  Qt.ItemIsEnabled )
+                
+                self.ui.tableWidget.setItem(row, 0, one)         
+                self.ui.tableWidget.setItem(row, 1, two)         
+                self.ui.tableWidget.setItem(row, 2, three)
+                row += 1
+   
+    """ Go down a directory """
+    def dirDown(self, element):
+        new_dir = self.ui.tableWidget.item(element.row(), 0).text()
+        valid_selection = False
+        with mutex:
+            for file in self.files:
+                print(file[3], file[2], new_dir)
+                if file[3] == True and file[2] == new_dir: 
+                    valid_selection = True
+                    break
+        
+        if not valid_selection:
+            print(new_dir, "Is not a valid selection")
+            return
+        
+        self.dir_stack.append(new_dir)
 
+        self.fetchServerFiles()
+        
+        self.fillTable()
 
+        print(new_dir, "IN HERE")
+    
+    """ Go up to the next directory """
+    def dirUp(self):
+        directory = len(self.dir_stack) - 1
+        
+        if (directory <= 0):
+            return
 
+        self.dir_stack.pop()
+        
+        self.fetchServerFiles()
+        self.fillTable()
 
 app = QApplication([])
 window = Window()

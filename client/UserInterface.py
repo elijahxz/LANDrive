@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'LANDriveUserInterface.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.5.3
+## Created by: Qt User Interface Compiler version 6.6.3
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -26,7 +26,7 @@ class Ui_MainWindow(object):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
         MainWindow.resize(1042, 786)
-        sizePolicy = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        sizePolicy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(MainWindow.sizePolicy().hasHeightForWidth())
@@ -45,7 +45,7 @@ class Ui_MainWindow(object):
         self.stackedWidget.setMaximumSize(QSize(16777215, 16777215))
         self.page = QWidget()
         self.page.setObjectName(u"page")
-        sizePolicy1 = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        sizePolicy1 = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         sizePolicy1.setHorizontalStretch(100)
         sizePolicy1.setVerticalStretch(100)
         sizePolicy1.setHeightForWidth(self.page.sizePolicy().hasHeightForWidth())
@@ -61,7 +61,7 @@ class Ui_MainWindow(object):
         self.verticalLayout.setSizeConstraint(QLayout.SetMaximumSize)
         self.header = QLabel(self.page)
         self.header.setObjectName(u"header")
-        sizePolicy2 = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        sizePolicy2 = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         sizePolicy2.setHorizontalStretch(100)
         sizePolicy2.setVerticalStretch(0)
         sizePolicy2.setHeightForWidth(self.header.sizePolicy().hasHeightForWidth())
@@ -76,14 +76,14 @@ class Ui_MainWindow(object):
 
         self.verticalLayout.addWidget(self.header)
 
-        self.verticalSpacer = QSpacerItem(2, 2, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        self.verticalSpacer = QSpacerItem(2, 2, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
 
         self.verticalLayout.addItem(self.verticalSpacer)
 
         self.connect_button = QPushButton(self.page)
         self.connect_button.setObjectName(u"connect_button")
         self.connect_button.setEnabled(True)
-        sizePolicy3 = QSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        sizePolicy3 = QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         sizePolicy3.setHorizontalStretch(0)
         sizePolicy3.setVerticalStretch(0)
         sizePolicy3.setHeightForWidth(self.connect_button.sizePolicy().hasHeightForWidth())
@@ -95,7 +95,7 @@ class Ui_MainWindow(object):
 
         self.verticalLayout.addWidget(self.connect_button, 0, Qt.AlignHCenter)
 
-        self.verticalSpacer_2 = QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding)
+        self.verticalSpacer_2 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
 
         self.verticalLayout.addItem(self.verticalSpacer_2)
 
@@ -196,7 +196,7 @@ class Ui_MainWindow(object):
 
         self.dir_name = QLabel(self.page_2)
         self.dir_name.setObjectName(u"dir_name")
-        sizePolicy4 = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        sizePolicy4 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         sizePolicy4.setHorizontalStretch(0)
         sizePolicy4.setVerticalStretch(0)
         sizePolicy4.setHeightForWidth(self.dir_name.sizePolicy().hasHeightForWidth())
@@ -244,7 +244,7 @@ class Ui_MainWindow(object):
         __qtablewidgetitem5 = QTableWidgetItem()
         self.tableWidget.setItem(1, 1, __qtablewidgetitem5)
         self.tableWidget.setObjectName(u"tableWidget")
-        sizePolicy5 = QSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        sizePolicy5 = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         sizePolicy5.setHorizontalStretch(100)
         sizePolicy5.setVerticalStretch(0)
         sizePolicy5.setHeightForWidth(self.tableWidget.sizePolicy().hasHeightForWidth())
@@ -256,6 +256,10 @@ class Ui_MainWindow(object):
         self.tableWidget.setAutoFillBackground(False)
         self.tableWidget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.tableWidget.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
+        self.tableWidget.setEditTriggers(QAbstractItemView.AnyKeyPressed|QAbstractItemView.DoubleClicked|QAbstractItemView.EditKeyPressed)
+        self.tableWidget.setDragDropOverwriteMode(False)
+        self.tableWidget.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.tableWidget.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.tableWidget.setTextElideMode(Qt.ElideRight)
         self.tableWidget.setHorizontalScrollMode(QAbstractItemView.ScrollPerPixel)
         self.tableWidget.setGridStyle(Qt.SolidLine)
@@ -454,7 +458,7 @@ class Ui_MainWindow(object):
     # setupUi
 
     def retranslateUi(self, MainWindow):
-        MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"MainWindow", None))
+        MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"LANDrive", None))
         self.header.setText(QCoreApplication.translate("MainWindow", u"LANDrive", None))
         self.connect_button.setText(QCoreApplication.translate("MainWindow", u"Connect", None))
         self.connect_label.setText("")
