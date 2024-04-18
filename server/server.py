@@ -4,35 +4,20 @@ import socket
 import sys
 import time
 import threading
-
+import pickle
+from shared import HOST, PORT, SERVER_ROOT_DIR, MAX_SIZE, ResponseCode, FileInfo
 from enum import StrEnum
 
 # This app does not ask the client to insert a port,
 # so the server and client always tries to access
 # 8504 on localhost
-HOST = "127.0.0.1"
-PORT = 8504
 MAX_USERS = 16
 # Random max size, may increase if needed
-MAX_SIZE = 16384
-
-SERVER_ROOT_DIR = "\\FileDirectory"
-
 SERVER_FILES = list()
 
 SERVER_TERMINATE = False
 
 mutex = threading.Lock()
-
-""" 
-    Commands that can be requested from the client
-    They are in a module because match/case statements
-    semantics are not the same if variables are used
-"""
-class ResponseCode(StrEnum):
-    CLOSE_CONNECTION = "TerminateTCPConnection"
-    REFRESH          = "RefreshFiles"
-
 
 def main():
     global SERVER_TERMINATE
@@ -97,8 +82,8 @@ def client_handler(c_socket):
             # Send the files in the server's directory to the user
             case ResponseCode.REFRESH:
                 with mutex:
-                    data = json.dumps(SERVER_FILES)
-                    c_socket.sendall(bytes(data, encoding="utf-8"))
+                    data = pickle.dumps(SERVER_FILES)
+                    c_socket.sendall(bytes(data))
             case _:
                 stdoutPrint("An error has occured, %s is not a valid client request" 
                             % (buffer))
@@ -133,15 +118,55 @@ def getServerFiles():
                 rel_path = path[path.find(SERVER_ROOT_DIR):]
                 current_dir = os.path.basename(rel_path)
                 for name in files:
-                    file_list.append([os.path.join(rel_path, name), current_dir, name, False])
+                    t_stamp, size = process_file_information(os.path.join(path,name))
+                    relative_path = os.path.join(rel_path, name) 
+                    
+                    new_file = FileInfo()
+                    new_file.update(rel_path, name, current_dir, t_stamp, size, False)
+
+                    file_list.append(new_file)
                 for subdir in subdirs: 
-                    file_list.append([os.path.join(rel_path, subdir), current_dir, subdir, True]) 
+                    t_stamp, size = process_file_information(os.path.join(path,subdir), True)
+                    # Size information for directories seems to be wrong, so just specify that its a directory
+                    size = "Directory" 
+                    relative_path = os.path.join(rel_path, subdir) 
+                    
+                    new_dir = FileInfo()
+                    new_dir.update(relative_path, subdir, current_dir, t_stamp, size, True)
+                    
+                    file_list.append(new_dir) 
             
             SERVER_FILES = file_list
    
         # The corresponding thread will check and update the files 
         # Approx. every 10 seconds
         time.sleep(10)
+def process_file_information(file_path, directory = False):
+    kilobytes = 1024.00
+    megabytes = kilobytes * 1024.00
+    gigabytes = megabytes * 1024.00
+    size = "" 
+
+    # Timestamp
+    modify_time = os.path.getmtime(file_path) 
+    t_ctime = time.ctime(modify_time)
+    time_obj = time.strptime(t_ctime)
+    t_stamp = time.strftime("%Y-%m-%d %H:%M:%S", time_obj)
+    
+    file_size = os.stat(file_path).st_size
+    if (file_size >= gigabytes):
+        file_size /= gigabytes 
+        size = "{:.2f} Gb".format(file_size)
+    elif file_size >= megabytes: 
+        file_size /= megabytes
+        size = "{:.2f} Mb".format(file_size)
+    elif file_size >= kilobytes:
+        file_size /= kilobytes 
+        size = "{:.2f} Kb".format(file_size)
+    else: 
+        size = "{:.0f} Bytes".format(file_size)
+
+    return t_stamp, size
 
 # Start program by calling main()
 if __name__ == "__main__":

@@ -1,8 +1,11 @@
 import json
 import time
+import pickle
 import socket
 import sys
 from threading import Lock
+
+from shared import HOST, PORT, BASE_DIR, MAX_SIZE, ResponseCode, FileInfo
 
 # Whew, thats alot.
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
@@ -25,21 +28,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QAbstractScrollArea, QApplicat
 """
 from UserInterface import Ui_MainWindow
 
-# This app does not ask the client to insert a port,
-# so the server and client always tries to access
-# 8504 on localhost
-HOST = "127.0.0.1"
-PORT = 8504
-
-MAX_SIZE = 16384
-
 mutex = Lock()
-
-# Server's base directory
-BASE_DIR = "FileDirectory"
-
-CLOSE_CONNECTION = "TerminateTCPConnection"
-REFRESH = "RefreshFiles"
 
 # QT Developer chose these. To change the screen, use we
 # self.ui.stackedWidget.setCurrentIndex(3)
@@ -94,7 +83,7 @@ class Window(QMainWindow):
         event.accept()
         # Always try to close the socket when the user closes the application
         try:
-            self.c_socket.send(CLOSE_CONNECTION.encode())
+            self.c_socket.send(ResponseCode.CLOSE_CONNECTION.encode())
             self.c_socket.close()
         except Exception:
             pass
@@ -162,7 +151,7 @@ class Window(QMainWindow):
         self.displayMainScreen()
 
     def disconnectFromServer(self):
-        self.c_socket.send(CLOSE_CONNECTION.encode())
+        self.c_socket.send(ResponseCode.CLOSE_CONNECTION.encode())
         self.c_socket.close()
 
         self.c_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -179,21 +168,18 @@ class Window(QMainWindow):
         
         self.fillTable()
 
-        print("FILES = ", self.files) 
-
         self.ui.stackedWidget.setCurrentIndex(MAIN_SCREEN)
 
     def displayConnectScreen(self):
         self.ui.stackedWidget.setCurrentIndex(CONNECT_SCREEN)
     
     def fetchServerFiles(self):
-        self.c_socket.send("RefreshFiles".encode())
+        self.c_socket.send(ResponseCode.REFRESH.encode())
 
         data = self.c_socket.recv(MAX_SIZE)
-        data = data.decode("utf-8")
         
-        with mutex: 
-            self.files = json.loads(data)
+        with mutex:
+            self.files = pickle.loads(data)
     
     def clearTable(self):
         while (self.ui.tableWidget.rowCount() > 0):
@@ -204,15 +190,14 @@ class Window(QMainWindow):
         dir_files = list()
         
         self.clearTable()
-        
         with mutex:
             for file in self.files:
-                if file[1] == self.dir_stack[ ( len(self.dir_stack) - 1 ) ]:
+                if file.current_dir == self.dir_stack[ ( len(self.dir_stack) - 1 ) ]:
                     dir_files.append(file)
-
+        
         if len(dir_files) == 0:
             self.ui.tableWidget.setRowCount(1)
-            one = QTableWidgetItem("No Files In Dir")
+            one = QTableWidgetItem("No Files In This Folder")
             two = QTableWidgetItem("")
             three = QTableWidgetItem("")
             
@@ -228,12 +213,9 @@ class Window(QMainWindow):
         else:
             self.ui.tableWidget.setRowCount(len(dir_files))
             for file in dir_files:
-                type_ = "File"
-                if file[3] == True:
-                    type_ = "dir"
-                one = QTableWidgetItem(file[2])
-                two = QTableWidgetItem(file[1])
-                three = QTableWidgetItem(type_)
+                one = QTableWidgetItem(file.name)
+                two = QTableWidgetItem(file.time_stamp)
+                three = QTableWidgetItem(file.size)
 
                 # Makes the row not selectable/editable
                 one.setFlags( Qt.ItemIsSelectable |  Qt.ItemIsEnabled )
@@ -251,8 +233,8 @@ class Window(QMainWindow):
         valid_selection = False
         with mutex:
             for file in self.files:
-                print(file[3], file[2], new_dir)
-                if file[3] == True and file[2] == new_dir: 
+                print(file.directory_flag, file.current_dir, new_dir)
+                if file.directory_flag == True and file.name == new_dir: 
                     valid_selection = True
                     break
         
