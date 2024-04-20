@@ -3,6 +3,7 @@ import json
 import time
 import pickle
 import socket
+import struct
 import sys
 from threading import Lock
 
@@ -95,7 +96,6 @@ class Window(QMainWindow):
         self.ui.setupUi(self)
 
         self.setupUiFunctionality()
-
 
         # Set exit program option on the context menu
         self.context_menu = QMenu(self)
@@ -318,12 +318,13 @@ class Window(QMainWindow):
         #self.window = UploadingWindow()
         #self.window.show()
     def uploadFiles(self, files):
+        self.ui.centralwidget.setEnabled(False)
         try:
             for file in files:
-                f = open(file, "rb")
-                data = f.read()
-                if not data:
-                    continue # TODO Give user interface an error
+                #f = open(file, "rb")
+                #data = f.read(MAX_SIZE)
+                #if not data:
+                #    continue # TODO Give user interface an error
                 
                 self.c_socket.send(ResponseCode.UPLOAD_FILE.encode())
 
@@ -333,7 +334,7 @@ class Window(QMainWindow):
                 for folder in self.dir_stack: 
                     path += folder + "/"
                 path += os.path.basename(file)
-
+                
                 self.c_socket.send(path.encode())
                 
                 # Check for duplicate
@@ -342,13 +343,23 @@ class Window(QMainWindow):
                     print("Duplicate on serverside")
                     continue;
                 
-                self.c_socket.sendall(data)
+                filesize = os.path.getsize(file)
+                self.c_socket.sendall(struct.pack("<Q", filesize))
+
+                with open(file, "rb") as f:
+                    while read_bytes := f.read(1024):
+                        self.c_socket.sendall(read_bytes)
+
+
+                #while data:
+                #    self.c_socket.send(data)
+                #    data = f.read(MAX_SIZE)
+                
                 #while(data):
                 #    self.c_socket.send(data)
                 #    data = f.read(MAX_SIZE - 1)
-                f.close()
                 
-                self.c_socket.send(b'0x0a')
+                f.close()
                 
                 response = self.c_socket.recv(MAX_SIZE)
                 response = response.decode()
@@ -363,6 +374,7 @@ class Window(QMainWindow):
         except IOError:
             print("ERROR in uploadFiles!")
 
+        self.ui.centralwidget.setEnabled(True)
 
 app = QApplication([])
 

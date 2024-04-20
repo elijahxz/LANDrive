@@ -1,6 +1,7 @@
 import json
 import os
 import socket
+import struct
 import sys
 import time
 import threading
@@ -71,7 +72,7 @@ def client_handler(c_socket):
     files = list()
 
     while True:
-        # Receive data from the client
+        # recieve data from the client
         request = c_socket.recv(MAX_SIZE)
         
         buffer = request.decode()
@@ -192,15 +193,48 @@ def uploadFileToServer(c_socket):
         except IOError:
             file = open(directory_path, "wb")
             c_socket.send(ResponseCode.SUCCESS.encode())
-
-        while True:
-            data = c_socket.recv(MAX_SIZE)
-            if data == b'0x0a': 
-                break
-            file.write(data)
+        
+        stdoutPrint(directory_path)
+        recieve_file(c_socket, directory_path)
+        #data = c_socket.recv(MAX_SIZE)
+        #while data:
+        #    if not data: 
+        #        break
+        #    else:
+        #        file.write(data)
+        #        data = c_socket.recv(MAX_SIZE)
         
         file.close()
         c_socket.send(ResponseCode.SUCCESS.encode())
+
+def recieve_file_size(c_socket):
+    fmt = "<Q"
+    expected_bytes = struct.calcsize(fmt)
+    recieved_bytes = 0
+    stream = bytes()
+
+    while recieved_bytes < expected_bytes:
+        chunk = c_socket.recv(expected_bytes - recieved_bytes)
+        stream += chunk
+        recieved_bytes += len(chunk)
+    filesize = struct.unpack(fmt, stream)[0]
+    return filesize
+
+def recieve_file(c_socket, filename):
+    # First read from the socket the amount of
+    # bytes that will be recieved from the file.
+    filesize = recieve_file_size(c_socket)
+    # Open a new file where to store the recieved data.
+    with open(filename, "wb") as f:
+        recieved_bytes = 0
+        # recieve the file data in 1024-bytes chunks
+        # until reaching the total amount of bytes
+        # that was informed by the client.
+        while recieved_bytes < filesize:
+            chunk = c_socket.recv(1024)
+            if chunk:
+                recieved_bytes += len(chunk)
+                f.write(chunk)
 
 # Start program by calling main()
 if __name__ == "__main__":
