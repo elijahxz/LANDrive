@@ -13,7 +13,7 @@ that is in the same directory as client.py AND server.py
 # 8504 on localhost
 HOST = "127.0.0.1"
 PORT = 8504
-MAX_SIZE = 16384
+MAX_SIZE = 1024
 
 # Used on the server side to specify which directory to look in (needs \)
 SERVER_ROOT_DIR = "\\FileDirectory"
@@ -29,7 +29,12 @@ BASE_DIR = SERVER_ROOT_DIR[1:]
 class ResponseCode(StrEnum):
     CLOSE_CONNECTION = "TerminateTCPConnection"
     REFRESH          = "RefreshFiles"
-
+    UPLOAD_FILE      = "TCPUploadFile"
+    DOWNLOAD_FILE    = "TCPDownloadFile"
+    DELETE_FILE      = "DeleteFile"
+    DUPLICATE        = "Duplicate"
+    SUCCESS          = "Success"
+    ERROR            = "Error"
 class FileInfo:
     def __init__(self):
         self.rel_path = ""

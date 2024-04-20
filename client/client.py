@@ -1,3 +1,4 @@
+import os
 import json
 import time
 import pickle
@@ -19,7 +20,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QAbstractScrollArea, QApplicat
     QHBoxLayout, QHeaderView, QLabel, QLayout,
     QMainWindow, QPushButton, QSizePolicy, QStackedWidget,
     QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout,
-    QWidget, QMenu, QStyleFactory)
+    QWidget, QMenu, QStyleFactory, QFileDialog, QMessageBox)
 
 """  
     Ui_Mainwindow is the barebones GUI I created in QT Developer
@@ -27,7 +28,7 @@ from PySide6.QtWidgets import (QAbstractItemView, QAbstractScrollArea, QApplicat
     you'll see why I used the tool instead :) ... It's a nightmare to program. 
 """
 from UserInterface import Ui_MainWindow
-
+from Upload import Ui_Form
 mutex = Lock()
 
 # QT Developer chose these. To change the screen, use we
@@ -35,6 +36,39 @@ mutex = Lock()
 CONNECT_SCREEN = 0
 MAIN_SCREEN = 1
 EDIT_SCREEN = 2
+
+class UploadingWindow(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.FINISHED = False
+        self.ui = Ui_Form()
+        self.ui.setupUi(self)
+        self.ui.close.clicked.connect(self.haltProcess)
+
+    def updateScreen(self, string):
+        # Force non-async update for the update
+        self.ui.files.setText(string)
+        self.ui.files.repaint()
+        
+        if done == True:
+            self.FINISHED = done
+            # This is to let the user see the process is done
+            time.sleep(1)
+            
+            self.haltProcess()
+            return
+    
+    def haltProcess(self):
+        if self.FINISHED:
+            self.close()
+        else:
+            alert = QMessageBox()
+            alert.setText("The files are not done uploading! Please wait.")
+            alert.exec()
+
+    def closeEvent(self, event):
+        self.haltProcess()
+        event.ignore()
 
 """ 
    The window is a wrapper class for Ui_MainWindow so we can interact with it. 
@@ -74,6 +108,7 @@ class Window(QMainWindow):
         self.ui.connect_button.clicked.connect(self.connectToServer)
         self.ui.disconnect_button.clicked.connect(self.disconnectFromServer)
         self.ui.back.clicked.connect(self.dirUp)
+        self.ui.upload.clicked.connect(self.selectFile)
 
         # Selecting a row calls an event handler
         self.ui.tableWidget.doubleClicked.connect(self.dirDown)
@@ -262,7 +297,75 @@ class Window(QMainWindow):
         self.fetchServerFiles()
         self.fillTable()
 
+    def selectFile(self):
+        #path = "~"
+        #home_path = os.path.expanduser(path)
+        #fname = QFileDialog.getOpenFileName(self, 'Open file',
+        # home_path)
+        
+        dlg = QFileDialog()
+        dlg.setFileMode(QFileDialog.ExistingFiles)
+        files = list()
+        if dlg.exec():
+            files = dlg.selectedFiles()
+            self.uploadFiles(files)
+            
+            #f = open(filenames[0], 'r')
+
+            #with f:
+            #    data = f.read()
+            #    self.contents.setText(data)
+        #self.window = UploadingWindow()
+        #self.window.show()
+    def uploadFiles(self, files):
+        try:
+            for file in files:
+                f = open(file, "rb")
+                data = f.read()
+                if not data:
+                    continue # TODO Give user interface an error
+                
+                self.c_socket.send(ResponseCode.UPLOAD_FILE.encode())
+
+                # Send the requested filepath to download the file at on 
+                # the server's side
+                path = ""
+                for folder in self.dir_stack: 
+                    path += folder + "/"
+                path += os.path.basename(file)
+
+                self.c_socket.send(path.encode())
+                
+                # Check for duplicate
+                response = self.c_socket.recv(MAX_SIZE)
+                if response.decode() == ResponseCode.DUPLICATE:
+                    print("Duplicate on serverside")
+                    continue;
+                
+                self.c_socket.sendall(data)
+                #while(data):
+                #    self.c_socket.send(data)
+                #    data = f.read(MAX_SIZE - 1)
+                f.close()
+                
+                self.c_socket.send(b'0x0a')
+                
+                response = self.c_socket.recv(MAX_SIZE)
+                response = response.decode()
+                if response == ResponseCode.SUCCESS:
+                    print("SUCCESS")
+                    # do something
+                else:
+                    print("NOT SUCCESS")
+                    # do something
+
+        
+        except IOError:
+            print("ERROR in uploadFiles!")
+
+
 app = QApplication([])
+
 window = Window()
 window.show()
 

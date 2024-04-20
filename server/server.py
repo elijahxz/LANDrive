@@ -84,6 +84,8 @@ def client_handler(c_socket):
                 with mutex:
                     data = pickle.dumps(SERVER_FILES)
                     c_socket.sendall(bytes(data))
+            case ResponseCode.UPLOAD_FILE:
+                uploadFileToServer(c_socket)
             case _:
                 stdoutPrint("An error has occured, %s is not a valid client request" 
                             % (buffer))
@@ -167,6 +169,38 @@ def process_file_information(file_path, directory = False):
         size = "{:.0f} Bytes".format(file_size)
 
     return t_stamp, size
+
+def uploadFileToServer(c_socket):
+    with mutex:
+        file = None
+        done = False
+        file_path = c_socket.recv(MAX_SIZE)
+        file_path = file_path.decode() 
+
+        server_py_path = os.path.dirname(os.path.realpath(__file__)) 
+        
+        directory_path = server_py_path + "/" + file_path
+
+        print(directory_path)
+        
+        basename = os.path.basename(directory_path)
+        
+        try:
+            file = open(directory_path, "rb")
+            c_socket.send(ResponseCode.DUPLICATE.encode())
+            return
+        except IOError:
+            file = open(directory_path, "wb")
+            c_socket.send(ResponseCode.SUCCESS.encode())
+
+        while True:
+            data = c_socket.recv(MAX_SIZE)
+            if data == b'0x0a': 
+                break
+            file.write(data)
+        
+        file.close()
+        c_socket.send(ResponseCode.SUCCESS.encode())
 
 # Start program by calling main()
 if __name__ == "__main__":
