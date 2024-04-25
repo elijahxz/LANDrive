@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QPushButton,
 
 class Ui_Form(object):
     def setupUi(self, Form):
-        Form.setWindowFlag(Qt.WindowCloseButtonHint, False)
+        #Form.setWindowFlag(Qt.WindowCloseButtonHint, False)
         if not Form.objectName():
             Form.setObjectName(u"Form")
         Form.setEnabled(True)
@@ -74,21 +74,21 @@ class Ui_Form(object):
 
         self.verticalLayout.addItem(self.verticalSpacer)
 
-        self.close = QPushButton(Form)
-        self.close.setObjectName(u"close")
+        self.closeBtn = QPushButton(Form)
+        self.closeBtn.setObjectName(u"close")
         sizePolicy2 = QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         sizePolicy2.setHorizontalStretch(0)
         sizePolicy2.setVerticalStretch(0)
-        sizePolicy2.setHeightForWidth(self.close.sizePolicy().hasHeightForWidth())
-        self.close.setSizePolicy(sizePolicy2)
-        self.close.setMinimumSize(QSize(120, 45))
+        sizePolicy2.setHeightForWidth(self.closeBtn.sizePolicy().hasHeightForWidth())
+        self.closeBtn.setSizePolicy(sizePolicy2)
+        self.closeBtn.setMinimumSize(QSize(120, 45))
         font2 = QFont()
         font2.setPointSize(11)
-        self.close.setFont(font2)
-        self.close.setLayoutDirection(Qt.LeftToRight)
-        self.close.setAutoRepeat(False)
+        self.closeBtn.setFont(font2)
+        self.closeBtn.setLayoutDirection(Qt.LeftToRight)
+        self.closeBtn.setAutoRepeat(False)
 
-        self.verticalLayout.addWidget(self.close, 0, Qt.AlignHCenter)
+        self.verticalLayout.addWidget(self.closeBtn, 0, Qt.AlignHCenter)
 
 
         self.horizontalLayout.addLayout(self.verticalLayout)
@@ -103,10 +103,10 @@ class Ui_Form(object):
     # setupUi
 
     def retranslateUi(self, Form):
-        Form.setWindowTitle(QCoreApplication.translate("Form", u"Uploading Files to Server...", None))
+        Form.setWindowTitle(QCoreApplication.translate("Form", u"File Upload Results", None))
         self.label_3.setText("")
-        self.label.setText(QCoreApplication.translate("Form", u"Uploading Files", None))
+        self.label.setText(QCoreApplication.translate("Form", u"Uploaded Files Status:", None))
         self.files.setText("")
-        self.close.setText(QCoreApplication.translate("Form", u"Close", None))
+        self.closeBtn.setText(QCoreApplication.translate("Form", u"Close", None))
     # retranslateUi
 

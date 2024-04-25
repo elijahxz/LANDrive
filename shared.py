@@ -35,6 +35,7 @@ class ResponseCode(StrEnum):
     DUPLICATE        = "Duplicate"
     SUCCESS          = "Success"
     ERROR            = "Error"
+    READY            = "Ready"
 class FileInfo:
     def __init__(self):
         self.rel_path = ""

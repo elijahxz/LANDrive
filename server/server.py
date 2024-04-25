@@ -173,8 +173,11 @@ def process_file_information(file_path, directory = False):
 
 def uploadFileToServer(c_socket):
     with mutex:
-        file = None
         done = False
+        
+        # Let the client know we are ready
+        c_socket.send(ResponseCode.READY.encode())
+
         file_path = c_socket.recv(MAX_SIZE)
         file_path = file_path.decode() 
 
@@ -203,8 +206,6 @@ def uploadFileToServer(c_socket):
         #    else:
         #        file.write(data)
         #        data = c_socket.recv(MAX_SIZE)
-        
-        file.close()
         c_socket.send(ResponseCode.SUCCESS.encode())
 
 def recieve_file_size(c_socket):

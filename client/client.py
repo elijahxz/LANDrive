@@ -38,34 +38,20 @@ CONNECT_SCREEN = 0
 MAIN_SCREEN = 1
 EDIT_SCREEN = 2
 
-class UploadingWindow(QWidget):
+class StatusWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.FINISHED = False
         self.ui = Ui_Form()
         self.ui.setupUi(self)
-        self.ui.close.clicked.connect(self.haltProcess)
+        self.ui.closeBtn.clicked.connect(self.hide)
 
-    def updateScreen(self, string):
+    def updateScreen(self, string, done):
         # Force non-async update for the update
         self.ui.files.setText(string)
         self.ui.files.repaint()
-        
-        if done == True:
-            self.FINISHED = done
-            # This is to let the user see the process is done
-            time.sleep(1)
-            
-            self.haltProcess()
-            return
     
     def haltProcess(self):
-        if self.FINISHED:
-            self.close()
-        else:
-            alert = QMessageBox()
-            alert.setText("The files are not done uploading! Please wait.")
-            alert.exec()
+        self.close()
 
     def closeEvent(self, event):
         self.haltProcess()
@@ -298,36 +284,43 @@ class Window(QMainWindow):
         self.fillTable()
 
     def selectFile(self):
-        #path = "~"
-        #home_path = os.path.expanduser(path)
-        #fname = QFileDialog.getOpenFileName(self, 'Open file',
-        # home_path)
+        files = list()
+
+        # I believe this should work for MAC, but untested.
+        default_dir = os.path.expanduser('~/Documents')
         
         dlg = QFileDialog()
         dlg.setFileMode(QFileDialog.ExistingFiles)
-        files = list()
+        dlg.setDirectory(default_dir)
+        
         if dlg.exec():
             files = dlg.selectedFiles()
-            self.uploadFiles(files)
             
-            #f = open(filenames[0], 'r')
-
-            #with f:
-            #    data = f.read()
-            #    self.contents.setText(data)
-        #self.window = UploadingWindow()
-        #self.window.show()
+            file_info = ""
+            self.window = StatusWindow()
+            
+            results = self.uploadFiles(files)
+            
+            self.window.show()
+            self.window.updateScreen(file_info, True)
+            
+            for result in results: 
+                file_info += result+"\n\n"
+        
+            self.window.updateScreen(file_info, True)
+        
+            
     def uploadFiles(self, files):
+        results = list()
         self.ui.centralwidget.setEnabled(False)
         try:
             for file in files:
-                #f = open(file, "rb")
-                #data = f.read(MAX_SIZE)
-                #if not data:
-                #    continue # TODO Give user interface an error
-                
                 self.c_socket.send(ResponseCode.UPLOAD_FILE.encode())
-
+                
+                response = self.c_socket.recv(MAX_SIZE)
+                if response.decode() != ResponseCode.READY:
+                    results.append(file + ": Error")
+                    continue
                 # Send the requested filepath to download the file at on 
                 # the server's side
                 path = ""
@@ -341,6 +334,7 @@ class Window(QMainWindow):
                 response = self.c_socket.recv(MAX_SIZE)
                 if response.decode() == ResponseCode.DUPLICATE:
                     print("Duplicate on serverside")
+                    results.append(file + ": Error, duplicate!")
                     continue;
                 
                 filesize = os.path.getsize(file)
@@ -351,30 +345,21 @@ class Window(QMainWindow):
                         self.c_socket.sendall(read_bytes)
 
 
-                #while data:
-                #    self.c_socket.send(data)
-                #    data = f.read(MAX_SIZE)
-                
-                #while(data):
-                #    self.c_socket.send(data)
-                #    data = f.read(MAX_SIZE - 1)
-                
-                f.close()
-                
                 response = self.c_socket.recv(MAX_SIZE)
                 response = response.decode()
                 if response == ResponseCode.SUCCESS:
-                    print("SUCCESS")
+                    results.append(file + ": Success!")
                     # do something
                 else:
-                    print("NOT SUCCESS")
+                    results.append(file + ": Failure")
                     # do something
 
-        
         except IOError:
             print("ERROR in uploadFiles!")
+            return results
 
         self.ui.centralwidget.setEnabled(True)
+        return results
 
 app = QApplication([])
 
