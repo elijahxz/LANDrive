@@ -38,24 +38,34 @@ CONNECT_SCREEN = 0
 MAIN_SCREEN = 1
 EDIT_SCREEN = 2
 
+"""
+    This window is a popup that can be displayed whenever 
+    clients download/upload/delete files from the server
+"""
 class StatusWindow(QWidget):
     def __init__(self):
         super().__init__()
+        self.window = False
         self.ui = Ui_Form()
         self.ui.setupUi(self)
-        self.ui.closeBtn.clicked.connect(self.hide)
+        self.ui.closeBtn.clicked.connect(self.closeCustomEvent)
 
+    def setEnableWindow(self, window):
+        self.window = window
+    
     def updateScreen(self, string, done):
         # Force non-async update for the update
         self.ui.files.setText(string)
         self.ui.files.repaint()
     
-    def haltProcess(self):
-        self.close()
+    def closeCustomEvent(self):
+        self.window.ui.stackedWidget.setEnabled(True)
+        self.hide()
 
     def closeEvent(self, event):
-        self.haltProcess()
-        event.ignore()
+        self.window.ui.stackedWidget.setEnabled(True)
+        event.accept()
+        self.close()
 
 """ 
    The window is a wrapper class for Ui_MainWindow so we can interact with it. 
@@ -70,9 +80,11 @@ class Window(QMainWindow):
         self.dir_stack = [BASE_DIR]
         
         self.files = list()
-
+        
         self.THEMES = QStyleFactory.keys()
         self.current_theme = app.style().name()
+            
+        self.current_selection = None
 
         # Create a socket for the client
         self.c_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -95,9 +107,12 @@ class Window(QMainWindow):
         self.ui.disconnect_button.clicked.connect(self.disconnectFromServer)
         self.ui.back.clicked.connect(self.dirUp)
         self.ui.upload.clicked.connect(self.selectFile)
+        self.ui.refresh.clicked.connect(self.refreshFiles)
+        self.ui.delete_2.clicked.connect(self.deleteFile)
 
         # Selecting a row calls an event handler
         self.ui.tableWidget.doubleClicked.connect(self.dirDown)
+        self.ui.tableWidget.clicked.connect(self.currentSelection)
 
     """ Called when the GUI is closed """
     def closeEvent(self, event):
@@ -193,7 +208,11 @@ class Window(QMainWindow):
 
     def displayConnectScreen(self):
         self.ui.stackedWidget.setCurrentIndex(CONNECT_SCREEN)
-    
+   
+    def refreshFiles(self):
+        self.fetchServerFiles()
+        self.fillTable()
+
     def fetchServerFiles(self):
         self.c_socket.send(ResponseCode.REFRESH.encode())
 
@@ -264,10 +283,8 @@ class Window(QMainWindow):
             return
         
         self.dir_stack.append(new_dir)
-
-        self.fetchServerFiles()
         
-        self.fillTable()
+        self.refreshFiles()
 
         print(new_dir, "IN HERE")
     
@@ -279,9 +296,8 @@ class Window(QMainWindow):
             return
 
         self.dir_stack.pop()
-        
-        self.fetchServerFiles()
-        self.fillTable()
+       
+        self.refreshFiles()
 
     def selectFile(self):
         files = list()
@@ -298,7 +314,7 @@ class Window(QMainWindow):
             
             file_info = ""
             self.window = StatusWindow()
-            
+            self.window.setEnableWindow(self) 
             results = self.uploadFiles(files)
             
             self.window.show()
@@ -309,10 +325,13 @@ class Window(QMainWindow):
         
             self.window.updateScreen(file_info, True)
         
+        # Update the files on the screen for the user
+        self.fetchServerFiles()
+        self.fillTable()
             
     def uploadFiles(self, files):
         results = list()
-        self.ui.centralwidget.setEnabled(False)
+        self.ui.stackedWidget.setEnabled(False)
         try:
             for file in files:
                 self.c_socket.send(ResponseCode.UPLOAD_FILE.encode())
@@ -358,8 +377,31 @@ class Window(QMainWindow):
             print("ERROR in uploadFiles!")
             return results
 
-        self.ui.centralwidget.setEnabled(True)
         return results
+
+    def currentSelection(self, element):
+        self.current_selection = self.ui.tableWidget.item(element.row(), 0).text()
+
+    def deleteFile(self):
+        directory = False
+        
+        if self.current_selection == None:
+            print("None Error") # TODO show screen
+            return
+
+        with mutex:
+            for file in self.files:
+                print(file.directory_flag, file.current_dir, self.current_selection)
+                if file.directory_flag == True and file.name == self.current_selection: 
+                    directory = True
+                    break
+        
+        if directory:
+            print("Error") # TODO show screen)
+            return
+        
+        #TODO send delete request to server
+
 
 app = QApplication([])
 

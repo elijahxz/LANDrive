@@ -1,11 +1,3 @@
-Food Items:
-2% Milk
-Bread
-Eggs
-Ice Cream
-
-
-Other: 
-Hangers
-Bike
-
+eggs
+milk
+cereal

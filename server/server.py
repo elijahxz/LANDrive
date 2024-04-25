@@ -142,8 +142,8 @@ def getServerFiles():
             SERVER_FILES = file_list
    
         # The corresponding thread will check and update the files 
-        # Approx. every 10 seconds
-        time.sleep(10)
+        # Approx. every second
+        time.sleep(1)
 def process_file_information(file_path, directory = False):
     kilobytes = 1024.00
     megabytes = kilobytes * 1024.00
