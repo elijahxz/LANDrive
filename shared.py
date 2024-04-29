@@ -29,6 +29,8 @@ BASE_DIR = SERVER_ROOT_DIR[1:]
 class ResponseCode(StrEnum):
     CLOSE_CONNECTION = "TerminateTCPConnection"
     REFRESH          = "RefreshFiles"
+    USERS            = "GetTCPUsers"
+    CREATE_DIR       = "CreateDirectory"
     UPLOAD_FILE      = "TCPUploadFile"
     DOWNLOAD_FILE    = "TCPDownloadFile"
     DELETE_FILE      = "DeleteFile"

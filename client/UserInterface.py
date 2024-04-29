@@ -283,6 +283,15 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout_5 = QHBoxLayout()
         self.horizontalLayout_5.setObjectName(u"horizontalLayout_5")
+        self.refresh = QPushButton(self.page_2)
+        self.refresh.setObjectName(u"refresh")
+        sizePolicy3.setHeightForWidth(self.refresh.sizePolicy().hasHeightForWidth())
+        self.refresh.setSizePolicy(sizePolicy3)
+        self.refresh.setMinimumSize(QSize(100, 60))
+        self.refresh.setFont(font3)
+
+        self.horizontalLayout_5.addWidget(self.refresh)
+
         self.upload = QPushButton(self.page_2)
         self.upload.setObjectName(u"upload")
         sizePolicy3.setHeightForWidth(self.upload.sizePolicy().hasHeightForWidth())
@@ -292,14 +301,14 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout_5.addWidget(self.upload)
 
-        self.refresh = QPushButton(self.page_2)
-        self.refresh.setObjectName(u"refresh")
-        sizePolicy3.setHeightForWidth(self.refresh.sizePolicy().hasHeightForWidth())
-        self.refresh.setSizePolicy(sizePolicy3)
-        self.refresh.setMinimumSize(QSize(100, 60))
-        self.refresh.setFont(font3)
+        self.create_dir = QPushButton(self.page_2)
+        self.create_dir.setObjectName(u"create_dir")
+        sizePolicy3.setHeightForWidth(self.create_dir.sizePolicy().hasHeightForWidth())
+        self.create_dir.setSizePolicy(sizePolicy3)
+        self.create_dir.setMinimumSize(QSize(100, 60))
+        self.create_dir.setFont(font3)
 
-        self.horizontalLayout_5.addWidget(self.refresh)
+        self.horizontalLayout_5.addWidget(self.create_dir)
 
         self.label_9 = QLabel(self.page_2)
         self.label_9.setObjectName(u"label_9")
@@ -488,8 +497,9 @@ class Ui_MainWindow(object):
         self.tableWidget.setSortingEnabled(False)
         self.tableWidget.setSortingEnabled(__sortingEnabled)
 
-        self.upload.setText(QCoreApplication.translate("MainWindow", u"Upload a File", None))
         self.refresh.setText(QCoreApplication.translate("MainWindow", u"Refresh Files", None))
+        self.upload.setText(QCoreApplication.translate("MainWindow", u"Upload a File", None))
+        self.create_dir.setText(QCoreApplication.translate("MainWindow", u"Create Dir", None))
         self.label_9.setText("")
         self.delete_2.setText(QCoreApplication.translate("MainWindow", u"Delete File", None))
         self.download.setText(QCoreApplication.translate("MainWindow", u"Download File", None))

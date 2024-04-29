@@ -5,6 +5,7 @@ import pickle
 import socket
 import struct
 import sys
+from datetime import datetime
 from threading import Lock
 
 from shared import HOST, PORT, BASE_DIR, MAX_SIZE, ResponseCode, FileInfo
@@ -21,7 +22,8 @@ from PySide6.QtWidgets import (QAbstractItemView, QAbstractScrollArea, QApplicat
     QHBoxLayout, QHeaderView, QLabel, QLayout,
     QMainWindow, QPushButton, QSizePolicy, QStackedWidget,
     QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout,
-    QWidget, QMenu, QStyleFactory, QFileDialog, QMessageBox)
+    QWidget, QMenu, QStyleFactory, QFileDialog, QMessageBox, QInputDialog
+)
 
 """  
     Ui_Mainwindow is the barebones GUI I created in QT Developer
@@ -107,9 +109,10 @@ class Window(QMainWindow):
         self.ui.disconnect_button.clicked.connect(self.disconnectFromServer)
         self.ui.back.clicked.connect(self.dirUp)
         self.ui.upload.clicked.connect(self.selectFile)
+        self.ui.download.clicked.connect(self.downloadFile)
         self.ui.refresh.clicked.connect(self.refreshFiles)
         self.ui.delete_2.clicked.connect(self.deleteFile)
-
+        self.ui.create_dir.clicked.connect(self.createDirectory)
         # Selecting a row calls an event handler
         self.ui.tableWidget.doubleClicked.connect(self.dirDown)
         self.ui.tableWidget.clicked.connect(self.currentSelection)
@@ -208,19 +211,97 @@ class Window(QMainWindow):
 
     def displayConnectScreen(self):
         self.ui.stackedWidget.setCurrentIndex(CONNECT_SCREEN)
-   
+  
+    def currentServerPath(self):
+        path = ""
+        for folder in self.dir_stack:
+            path += folder + "/"
+        
+        return path
+
     def refreshFiles(self):
         self.fetchServerFiles()
         self.fillTable()
 
+    def recieveDataSize(self):
+        fmt = "<Q"
+        expected_bytes = struct.calcsize(fmt)
+        recieved_bytes = 0
+        stream = bytes()
+
+        while recieved_bytes < expected_bytes:
+            chunk = self.c_socket.recv(expected_bytes - recieved_bytes)
+            stream += chunk
+            recieved_bytes += len(chunk)
+        
+        datasize = struct.unpack(fmt, stream)[0]
+        return datasize
+
+    def recieveData(self):
+        # First read from the socket the amount of
+        # bytes that will be recieved from the server.
+        datasize = self.recieveDataSize()
+
+        recieved_bytes = 0
+        data = bytes()
+        # recieve the data in 1024-bytes chunks
+        # until reaching the total amount of bytes
+        # that was informed by the server.
+        while recieved_bytes < datasize:
+            chunk = self.c_socket.recv(MAX_SIZE)
+            if chunk:
+                recieved_bytes += len(chunk)
+                data = data + chunk
+        
+        return data
+
+    def recieveFile(self, filename):
+        # First read from the socket the amount of
+        # bytes that will be recieved from the file.
+        filesize = self.recieveDataSize()
+        # Open a new file where to store the recieved data.
+        with open(filename, "wb") as f:
+            recieved_bytes = 0
+            # recieve the file data in 1024-bytes chunks
+            # until reaching the total amount of bytes
+            # that was informed by the client.
+            while recieved_bytes < filesize:
+                chunk = self.c_socket.recv(MAX_SIZE)
+                if chunk:
+                    recieved_bytes += len(chunk)
+                    f.write(chunk)
+    
     def fetchServerFiles(self):
         self.c_socket.send(ResponseCode.REFRESH.encode())
+       
+        data = self.recieveData()
 
-        data = self.c_socket.recv(MAX_SIZE)
-        
+        # We assume no error when pickling the file, but there 
+        # should be a try/catch block here...TODO for the future
         with mutex:
             self.files = pickle.loads(data)
-    
+       
+        now = datetime.now()
+
+        #date_string = now.strftime("%B %d, %Y %H:%M:%S")
+        date_string = now.strftime("%H:%M:%S")
+        self.ui.updated.setText("Last Updated: " + date_string)
+        self.ui.updated.repaint()
+
+        self.c_socket.send(ResponseCode.USERS.encode())
+
+        data = self.c_socket.recv(MAX_SIZE)
+        users = data.decode()
+       
+        # Updates main screen
+        self.ui.users.setText("Users: " + users)
+        self.ui.users.repaint()
+
+        # Updates the file editing screen
+        self.ui.users_2.setText("Users: " + users)
+        self.ui.users_2.repaint()
+
+        
     def clearTable(self):
         while (self.ui.tableWidget.rowCount() > 0):
             self.ui.tableWidget.removeRow(0)
@@ -299,6 +380,45 @@ class Window(QMainWindow):
        
         self.refreshFiles()
 
+    def createDirectory(self):
+        text, ok = QInputDialog.getText(self, 
+                                         "Directory Name", 
+                                         "Enter desired directory name:"
+                                         )
+       
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.setWindowTitle("Status")
+        
+        if ok:
+            self.c_socket.send(ResponseCode.CREATE_DIR.encode())
+                
+            response = self.c_socket.recv(MAX_SIZE)
+            if response.decode() != ResponseCode.READY:
+                msg.setText("There was an error on the server's side. " +
+                            "Please try again.")
+                msg.exec()
+                return
+            
+            path = self.currentServerPath() + text
+            
+            print(path)
+
+            self.c_socket.send(path.encode())
+            
+            response = self.c_socket.recv(MAX_SIZE)
+
+            if response.decode() == ResponseCode.SUCCESS:
+                msg.setText("Success!!!")
+            elif response.decode() == ResponseCode.DUPLICATE:
+                msg.setText("Error: Duplicate directory found!")
+            else:
+                msg.setText("Error: Could not create directory.")
+            
+            msg.exec()
+            self.refreshFiles()  
+
     def selectFile(self):
         files = list()
 
@@ -342,11 +462,8 @@ class Window(QMainWindow):
                     continue
                 # Send the requested filepath to download the file at on 
                 # the server's side
-                path = ""
-                for folder in self.dir_stack: 
-                    path += folder + "/"
-                path += os.path.basename(file)
-                
+                path = self.currentServerPath() + os.path.basename(file)
+        
                 self.c_socket.send(path.encode())
                 
                 # Check for duplicate
@@ -381,10 +498,15 @@ class Window(QMainWindow):
 
     def currentSelection(self, element):
         self.current_selection = self.ui.tableWidget.item(element.row(), 0).text()
+        print(self.current_selection)
+
+    def directory_delete_confirmation(self, selection):
+        if selection.text() == "OK":
+            self.deleteFileOrDirectory()
 
     def deleteFile(self):
         directory = False
-        
+        directory_confirmation = False 
         if self.current_selection == None:
             print("None Error") # TODO show screen
             return
@@ -396,13 +518,95 @@ class Window(QMainWindow):
                     directory = True
                     break
         
+        # If its a directory, confirm deletion
         if directory:
-            print("Error") # TODO show screen)
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Question)
+            msg.setText("This is a directory, are you sure you want to delete it?")
+            msg.setWindowTitle("Directory Selected!")
+            msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+            msg.buttonClicked.connect(self.directory_delete_confirmation)
+            msg.exec()
             return
         
-        #TODO send delete request to server
+        self.deleteFileOrDirectory() 
+    
+    def deleteFileOrDirectory(self):
+        self.c_socket.send(ResponseCode.DELETE_FILE.encode())
+        
+        response = self.c_socket.recv(MAX_SIZE)
+        if response.decode() != ResponseCode.READY:
+            print("SERVER NOT READY TO DELETE")
+            return
 
+        path = self.currentServerPath() + self.current_selection
+        
+        print(path)
+        
+        self.c_socket.send(path.encode())
 
+        response = self.c_socket.recv(MAX_SIZE)
+        response = response.decode()
+       
+        # Show the user if the delete was successful or not
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.setWindowTitle("Status")
+        if response == ResponseCode.SUCCESS:
+            msg.setText("Deletion Successfull!")
+            msg.exec()
+        else:
+            msg.setText("Error: file or directory could not be deleted, or " + 
+                        "has already been deleted by another user.\nPlease " +
+                        "refresh and try again.")
+            msg.exec()
+        
+        self.refreshFiles()            
+
+    def downloadFile(self):
+        files = list()
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.setWindowTitle("Status")
+
+        if self.current_selection is None:
+            msg.setText("Please select a file to download!")
+            msg.exec()
+            return
+        
+        self.c_socket.send(ResponseCode.DOWNLOAD_FILE.encode())
+
+        response = self.c_socket.recv(MAX_SIZE)
+        
+        if response.decode() != ResponseCode.READY:
+            msg.setText("The file requested to download was not found on the " +
+                        "server. Please refresh and try again!")
+            msg.exec()
+            return 
+
+        # I believe this should work for MAC, but untested.
+        default_dir = os.path.expanduser("~/Documents" + "/" + self.current_selection)
+        
+        filename = QFileDialog().getSaveFileName(self, "Save File", default_dir) 
+        
+        selected_file = self.currentServerPath() + self.current_selection
+        
+        self.c_socket.send(selected_file.encode())
+        
+        response = self.c_socket.recv(MAX_SIZE)
+        
+        if response.decode() != ResponseCode.SUCCESS:
+            msg.setText("There was an error on the server's side, please try again.")
+            msg.exec()
+            return
+       
+        # Let the server know we are ready to get the file
+        self.c_socket.send(ResponseCode.READY.encode())
+
+        data = self.recieveFile(filename[0])
+        
 app = QApplication([])
 
 window = Window()

@@ -1,3 +1,4 @@
 eggs
 milk
-cereal
+soup
+water

@@ -1,28 +1,33 @@
 import json
 import os
+import shutil
 import socket
 import struct
 import sys
 import time
 import threading
 import pickle
+from pathlib import Path
 from shared import HOST, PORT, SERVER_ROOT_DIR, MAX_SIZE, ResponseCode, FileInfo
 from enum import StrEnum
 
-# This app does not ask the client to insert a port,
-# so the server and client always tries to access
-# 8504 on localhost
+# Max users for the server
 MAX_USERS = 16
-# Random max size, may increase if needed
+
 SERVER_FILES = list()
 
 SERVER_TERMINATE = False
 
-mutex = threading.Lock()
+USER_COUNT = 0
+
+user_mutex = threading.Lock()
+refresh_mutex = threading.Lock()
+upload_mutex = threading.Lock()
+delete_mutex = threading.Lock()
 
 def main():
     global SERVER_TERMINATE
-
+    global USER_COUNT
     stdoutPrint("Server running...\n")
     # TCP socket
     s_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -44,6 +49,9 @@ def main():
             c_socket, c_address = s_socket.accept()
             stdoutPrint("Client connected, client's address = %s" % (c_address,))
             sys.stdout.flush()
+           
+            with user_mutex:
+                USER_COUNT += 1
             
             # Create a new thread to handle the client
             # This thread runs the client_handler function
@@ -61,55 +69,90 @@ def main():
     
     return
 
-# I may be using threads and sockets wrong, because printing 
-# will not work unless I flush stdout after each print statement
+""" 
+    I may be using threads and sockets wrong, because printing will 
+    not work unless I flush stdout after each print statement
+"""
 def stdoutPrint(message):
     print(message)
     sys.stdout.flush()
 
-# Function to handle client connections
+""" Function to handle client connections """
 def client_handler(c_socket):
-    files = list()
+    global USER_COUNT
+    try:
+        files = list()
 
-    while True:
-        # recieve data from the client
-        request = c_socket.recv(MAX_SIZE)
-        
-        buffer = request.decode()
-        
-        match buffer:
-            case ResponseCode.CLOSE_CONNECTION:
-                break # This breaks the while loop!
-            # Send the files in the server's directory to the user
-            case ResponseCode.REFRESH:
-                with mutex:
-                    data = pickle.dumps(SERVER_FILES)
-                    c_socket.sendall(bytes(data))
-            case ResponseCode.UPLOAD_FILE:
-                uploadFileToServer(c_socket)
-            case _:
-                stdoutPrint("An error has occured, %s is not a valid client request" 
-                            % (buffer))
-         
-        stdoutPrint("Client message: %s" % (buffer))
-        if (buffer == ResponseCode.CLOSE_CONNECTION):
-            break
-        
-    # Close the connection with the client
-    c_socket.close()
+        while True:
+            # recieve data from the client
+            request = c_socket.recv(MAX_SIZE)
+            
+            buffer = request.decode()
+            
+            match buffer:
+                # This breaks the while loop!
+                case ResponseCode.CLOSE_CONNECTION:
+                    with user_mutex:
+                        USER_COUNT -= 1
+                    break
+
+                case ResponseCode.USERS:
+                    with user_mutex:
+                        c_socket.send(str(USER_COUNT).encode())
+
+                # Send the files in the server's directory to the user
+                case ResponseCode.REFRESH:
+                    with refresh_mutex:
+                        sent = 0
+                        data = pickle.dumps(SERVER_FILES)
+                        
+                        stream = bytes(data)
+                        stream_length = len(stream)
+                        c_socket.sendall(struct.pack("<Q", stream_length))
+                        c_socket.sendall(stream)
+
+                case ResponseCode.UPLOAD_FILE:
+                    with upload_mutex:
+                        upload_file_to_server(c_socket)
+
+                case ResponseCode.CREATE_DIR:
+                    with refresh_mutex:
+                        create_directory(c_socket)
+
+                case ResponseCode.DOWNLOAD_FILE:
+                    # A person can not delete a file that is trying to be dowloaded
+                    with delete_mutex:
+                        download_file(c_socket)
+                
+                case ResponseCode.DELETE_FILE:
+                    with delete_mutex:
+                        delete_file(c_socket)
+
+                case _:
+                    stdoutPrint("An error has occured, %s is not a valid client request" 
+                                % (buffer))
+             
+            stdoutPrint("Client message: %s" % (buffer))
+            if (buffer == ResponseCode.CLOSE_CONNECTION):
+                break
+            
+        # Close the connection with the client
+        c_socket.close()
+
+    except Exception:
+        # Assume there was an error with the socket, so this thread will be interupted and end
+        with user_mutex:
+            USER_COUNT -= 1
 
 """
     Get an updated list of available files from the server
-    Output structure:
-        A list of lists, each sublist looks like this:
-            [relative path, file name]
 """
 def getServerFiles():
     global SERVER_FILES
     file_list = list()
     
     while not SERVER_TERMINATE: 
-        with mutex:
+        with refresh_mutex:
             file_list = list()
             # Gets the path of this file, server.py. 
             # FileDirectory/ should be at the same path 
@@ -142,8 +185,14 @@ def getServerFiles():
             SERVER_FILES = file_list
    
         # The corresponding thread will check and update the files 
-        # Approx. every second
+        # Approx. every second (with mutex locking it may vary)
         time.sleep(1)
+
+
+"""
+    Gets the details of each file on the server.
+    Note: Directory size is wrong usually
+"""
 def process_file_information(file_path, directory = False):
     kilobytes = 1024.00
     megabytes = kilobytes * 1024.00
@@ -171,43 +220,45 @@ def process_file_information(file_path, directory = False):
 
     return t_stamp, size
 
-def uploadFileToServer(c_socket):
-    with mutex:
-        done = False
-        
-        # Let the client know we are ready
-        c_socket.send(ResponseCode.READY.encode())
+""" 
+    Handles the request to upload a file to the server.
+"""
+def upload_file_to_server(c_socket):
+    done = False
+    
+    # Let the client know we are ready
+    c_socket.send(ResponseCode.READY.encode())
 
-        file_path = c_socket.recv(MAX_SIZE)
-        file_path = file_path.decode() 
+    file_path = c_socket.recv(MAX_SIZE)
+    file_path = file_path.decode() 
 
-        server_py_path = os.path.dirname(os.path.realpath(__file__)) 
-        
-        directory_path = server_py_path + "/" + file_path
+    server_py_path = os.path.dirname(os.path.realpath(__file__)) 
+    
+    directory_path = server_py_path + "/" + file_path
 
-        print(directory_path)
-        
-        basename = os.path.basename(directory_path)
-        
-        try:
-            file = open(directory_path, "rb")
-            c_socket.send(ResponseCode.DUPLICATE.encode())
-            return
-        except IOError:
-            file = open(directory_path, "wb")
-            c_socket.send(ResponseCode.SUCCESS.encode())
-        
-        stdoutPrint(directory_path)
-        recieve_file(c_socket, directory_path)
-        #data = c_socket.recv(MAX_SIZE)
-        #while data:
-        #    if not data: 
-        #        break
-        #    else:
-        #        file.write(data)
-        #        data = c_socket.recv(MAX_SIZE)
+    print(directory_path)
+    
+    basename = os.path.basename(directory_path)
+    
+    try:
+        file = open(directory_path, "rb")
+        c_socket.send(ResponseCode.DUPLICATE.encode())
+        return
+    except IOError:
+        file = open(directory_path, "wb")
         c_socket.send(ResponseCode.SUCCESS.encode())
+    
+    stdoutPrint(directory_path)
+    
+    recieve_file(c_socket, directory_path)
+    
+    c_socket.send(ResponseCode.SUCCESS.encode())
 
+
+"""
+    Since files can be larger than MAX_SIZE, we have to create a struct and 
+    send over the file size, then the file directly after
+"""
 def recieve_file_size(c_socket):
     fmt = "<Q"
     expected_bytes = struct.calcsize(fmt)
@@ -221,6 +272,9 @@ def recieve_file_size(c_socket):
     filesize = struct.unpack(fmt, stream)[0]
     return filesize
 
+"""
+    Recieves the file information from the client
+"""
 def recieve_file(c_socket, filename):
     # First read from the socket the amount of
     # bytes that will be recieved from the file.
@@ -232,10 +286,93 @@ def recieve_file(c_socket, filename):
         # until reaching the total amount of bytes
         # that was informed by the client.
         while recieved_bytes < filesize:
-            chunk = c_socket.recv(1024)
+            chunk = c_socket.recv(MAX_SIZE)
             if chunk:
                 recieved_bytes += len(chunk)
                 f.write(chunk)
+
+"""
+    Creates a directory on the server's side
+"""
+def create_directory(c_socket):
+    c_socket.send(ResponseCode.READY.encode())
+    
+    path = c_socket.recv(MAX_SIZE)
+    server_py_path = os.path.dirname(os.path.realpath(__file__)) 
+    directory_path = Path(server_py_path + "/" + path.decode())
+    print(directory_path)
+    stdoutPrint(directory_path)
+    try:
+        os.mkdir(directory_path)
+        c_socket.send(ResponseCode.SUCCESS.encode()) 
+    except OSError as error:
+        if error is FileExistsError:
+            c_socket.send(ResponseCode.DUPLICATE.encode())
+        else:
+            c_socket.send(ResponseCode.ERROR.encode())
+        return
+
+
+""" 
+    Deletes a file (or directory) on the server's side
+"""
+def delete_file(c_socket):
+    c_socket.send(ResponseCode.READY.encode())
+    
+    file_path = c_socket.recv(MAX_SIZE)
+    file_path = file_path.decode() 
+    
+    server_py_path = os.path.dirname(os.path.realpath(__file__)) 
+        
+    directory_path = Path(server_py_path + "/" + file_path)
+   
+    # Directory case
+    if os.path.isdir(directory_path):
+        shutil.rmtree(directory_path)
+        c_socket.send(ResponseCode.SUCCESS.encode())
+    
+    # File case
+    elif os.path.isfile(directory_path):
+        os.remove(directory_path)
+        c_socket.send(ResponseCode.SUCCESS.encode())
+   
+    # DNE case (probably already deleted and user did not refresh)
+    else:
+        c_socket.send(ResponseCode.ERROR.encode())
+
+"""
+    Sends file data from the client to the server
+"""
+def download_file(c_socket):
+    c_socket.send(ResponseCode.READY.encode())
+
+    file = c_socket.recv(MAX_SIZE)
+    file = file.decode()
+    
+    server_py_path = os.path.dirname(os.path.realpath(__file__)) 
+    
+    path = server_py_path + "/" + file
+    
+    # Ensure the file has not been deleted already
+    try:
+        f = open(path, "rb")
+    except FileNotFoundError:
+        c_socket.send(ResponseCode.ERROR.encode())
+        return 
+   
+    c_socket.send(ResponseCode.SUCCESS.encode())
+    
+    response = c_socket.recv(MAX_SIZE)
+    
+    if response.decode() != ResponseCode.READY:
+        return
+
+    c_socket.sendall(struct.pack("<Q", os.path.getsize(path)))
+    while read_bytes := f.read(MAX_SIZE):
+        c_socket.sendall(read_bytes)
+
+
+
 
 # Start program by calling main()
 if __name__ == "__main__":

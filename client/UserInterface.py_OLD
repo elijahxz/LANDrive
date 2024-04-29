@@ -25,7 +25,7 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         if not MainWindow.objectName():
             MainWindow.setObjectName(u"MainWindow")
-        MainWindow.resize(1042, 786)
+        MainWindow.resize(1046, 786)
         sizePolicy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -292,6 +292,15 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout_5.addWidget(self.upload)
 
+        self.refresh = QPushButton(self.page_2)
+        self.refresh.setObjectName(u"refresh")
+        sizePolicy3.setHeightForWidth(self.refresh.sizePolicy().hasHeightForWidth())
+        self.refresh.setSizePolicy(sizePolicy3)
+        self.refresh.setMinimumSize(QSize(100, 60))
+        self.refresh.setFont(font3)
+
+        self.horizontalLayout_5.addWidget(self.refresh)
+
         self.label_9 = QLabel(self.page_2)
         self.label_9.setObjectName(u"label_9")
         sizePolicy4.setHeightForWidth(self.label_9.sizePolicy().hasHeightForWidth())
@@ -480,6 +489,7 @@ class Ui_MainWindow(object):
         self.tableWidget.setSortingEnabled(__sortingEnabled)
 
         self.upload.setText(QCoreApplication.translate("MainWindow", u"Upload a File", None))
+        self.refresh.setText(QCoreApplication.translate("MainWindow", u"Refresh Files", None))
         self.label_9.setText("")
         self.delete_2.setText(QCoreApplication.translate("MainWindow", u"Delete File", None))
         self.download.setText(QCoreApplication.translate("MainWindow", u"Download File", None))
