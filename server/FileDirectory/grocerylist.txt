@@ -1,4 +1,12 @@
-eggs
-milk
-soup
-water
+Main:
+	Water
+	Milk
+	Eggs
+	Soda
+	Flour
+	Baking Soda
+
+Other:
+	Entertainment Center
+	Mop
+	Dust pan

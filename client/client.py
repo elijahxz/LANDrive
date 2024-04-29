@@ -5,6 +5,7 @@ import pickle
 import socket
 import struct
 import sys
+import tempfile
 from datetime import datetime
 from threading import Lock
 
@@ -32,17 +33,21 @@ from PySide6.QtWidgets import (QAbstractItemView, QAbstractScrollArea, QApplicat
 """
 from UserInterface import Ui_MainWindow
 from Upload import Ui_Form
-mutex = Lock()
 
-# QT Developer chose these. To change the screen, use we
-# self.ui.stackedWidget.setCurrentIndex(3)
+""" Mutex for accessing the self.files list in the Window Class """
+fileMutex = Lock()
+
+"""
+    QT Developer chose these. To change the screen, use we
+    self.ui.stackedWidget.setCurrentIndex(3)
+"""
 CONNECT_SCREEN = 0
 MAIN_SCREEN = 1
 EDIT_SCREEN = 2
 
 """
-    This window is a popup that can be displayed whenever 
-    clients download/upload/delete files from the server
+    This window is a popup that is displayed when a user
+    uploads files from their local machine
 """
 class StatusWindow(QWidget):
     def __init__(self):
@@ -77,15 +82,21 @@ class Window(QMainWindow):
         super(Window, self).__init__(parent)
         # Used for connecting to the server 
         self.CONNECTING = False
+       
+        # Used to detect if the user is editing a file
+        self.EDITING = False
         
         # Keep track of how far the user goes down the file tree
         self.dir_stack = [BASE_DIR]
         
+        # This is used to keep track of the files on the server's side
         self.files = list()
         
+        # Contains the themes for the application
         self.THEMES = QStyleFactory.keys()
         self.current_theme = app.style().name()
-            
+           
+        # Contains which file is selected by the user at any given time
         self.current_selection = None
 
         # Create a socket for the client
@@ -97,22 +108,29 @@ class Window(QMainWindow):
 
         self.setupUiFunctionality()
 
-        # Set exit program option on the context menu
+        # Setup the exit program & change theme option for the context menu
         self.context_menu = QMenu(self)
         action1 = self.context_menu.addAction("Change Theme")
         action1.triggered.connect(self.changeTheme)
         action2 = self.context_menu.addAction("Exit Program")
         action2.triggered.connect(QApplication.quit)
-   
+  
+    """ Sets up all of the button functionality and click events """
     def setupUiFunctionality(self):
         self.ui.connect_button.clicked.connect(self.connectToServer)
         self.ui.disconnect_button.clicked.connect(self.disconnectFromServer)
+        self.ui.disconnect_2.clicked.connect(self.disconnectFromServerWhileEditing)
         self.ui.back.clicked.connect(self.dirUp)
+        self.ui.refresh.clicked.connect(self.refreshFiles)
         self.ui.upload.clicked.connect(self.selectFile)
         self.ui.download.clicked.connect(self.downloadFile)
-        self.ui.refresh.clicked.connect(self.refreshFiles)
+        self.ui.edit.clicked.connect(self.editFile)
+        self.ui.cancel.clicked.connect(self.editCancel)
+        self.ui.save.clicked.connect(self.editSave)
         self.ui.delete_2.clicked.connect(self.deleteFile)
         self.ui.create_dir.clicked.connect(self.createDirectory)
+        
+
         # Selecting a row calls an event handler
         self.ui.tableWidget.doubleClicked.connect(self.dirDown)
         self.ui.tableWidget.clicked.connect(self.currentSelection)
@@ -120,6 +138,11 @@ class Window(QMainWindow):
     """ Called when the GUI is closed """
     def closeEvent(self, event):
         event.accept()
+        
+        # If we are editing a file, let the server know we are done
+        if self.EDITING:
+            self.editCancel()
+
         # Always try to close the socket when the user closes the application
         try:
             self.c_socket.send(ResponseCode.CLOSE_CONNECTION.encode())
@@ -130,9 +153,8 @@ class Window(QMainWindow):
     """ Used for right clicking on the mouse """
     def contextMenuEvent(self, e):
         self.context_menu.exec(e.globalPos())
-
     
-    # Changes the theme of the app (called by a menuevent)
+    """ Changes the theme of the app (called by a menuevent) """
     def changeTheme(self):
         counter = 0
         length = len(self.THEMES) - 1
@@ -189,6 +211,12 @@ class Window(QMainWindow):
 
         self.displayMainScreen()
 
+    """ If we try to disconnect while editing a file, let the server know """
+    def disconnectFromServerWhileEditing(self):
+        self.editCancel()
+        self.disconnectFromServer()
+
+    """ Disconnects from the server and shows the connect screen """
     def disconnectFromServer(self):
         self.c_socket.send(ResponseCode.CLOSE_CONNECTION.encode())
         self.c_socket.close()
@@ -197,6 +225,7 @@ class Window(QMainWindow):
 
         self.displayConnectScreen()
     
+    """ Sets up the main screen to be displayed """
     def displayMainScreen(self):
         # Hide connection and show the main widget
         self.ui.connect_label.setText("")
@@ -209,9 +238,18 @@ class Window(QMainWindow):
 
         self.ui.stackedWidget.setCurrentIndex(MAIN_SCREEN)
 
+    """ Shows the connect screen """
     def displayConnectScreen(self):
         self.ui.stackedWidget.setCurrentIndex(CONNECT_SCREEN)
+    
+    """ 
+        Called when a table element is clicked
+        This is stored in a variable for future functionality
+    """
+    def currentSelection(self, element):
+        self.current_selection = self.ui.tableWidget.item(element.row(), 0).text()
   
+    """ Gets the relative path for the server directory that is shown on the screen """
     def currentServerPath(self):
         path = ""
         for folder in self.dir_stack:
@@ -219,10 +257,12 @@ class Window(QMainWindow):
         
         return path
 
+    """ Refreshes the server's files """
     def refreshFiles(self):
         self.fetchServerFiles()
         self.fillTable()
 
+    """ Used to recieve a file, this gets the size of the file """
     def recieveDataSize(self):
         fmt = "<Q"
         expected_bytes = struct.calcsize(fmt)
@@ -237,6 +277,7 @@ class Window(QMainWindow):
         datasize = struct.unpack(fmt, stream)[0]
         return datasize
 
+    """ Recieves data from the server (used in self.fetchServerFiles) """
     def recieveData(self):
         # First read from the socket the amount of
         # bytes that will be recieved from the server.
@@ -255,6 +296,7 @@ class Window(QMainWindow):
         
         return data
 
+    """ Recieves a file from the server and saves it to the specified filename """
     def recieveFile(self, filename):
         # First read from the socket the amount of
         # bytes that will be recieved from the file.
@@ -271,6 +313,7 @@ class Window(QMainWindow):
                     recieved_bytes += len(chunk)
                     f.write(chunk)
     
+    """ Gets the current version of the server files from the server """
     def fetchServerFiles(self):
         self.c_socket.send(ResponseCode.REFRESH.encode())
        
@@ -278,7 +321,7 @@ class Window(QMainWindow):
 
         # We assume no error when pickling the file, but there 
         # should be a try/catch block here...TODO for the future
-        with mutex:
+        with fileMutex:
             self.files = pickle.loads(data)
        
         now = datetime.now()
@@ -302,20 +345,23 @@ class Window(QMainWindow):
         self.ui.users_2.repaint()
 
         
+    """ Clears the table that shows the files (used during refresh & traversal) """
     def clearTable(self):
         while (self.ui.tableWidget.rowCount() > 0):
             self.ui.tableWidget.removeRow(0)
     
+    """ Fills the table that shows the files (used during refresh & traversal) """
     def fillTable(self):
         row = 0
         dir_files = list()
         
         self.clearTable()
-        with mutex:
+        with fileMutex:
             for file in self.files:
                 if file.current_dir == self.dir_stack[ ( len(self.dir_stack) - 1 ) ]:
                     dir_files.append(file)
-        
+       
+        # No files in the directory
         if len(dir_files) == 0:
             self.ui.tableWidget.setRowCount(1)
             one = QTableWidgetItem("No Files In This Folder")
@@ -352,22 +398,23 @@ class Window(QMainWindow):
     def dirDown(self, element):
         new_dir = self.ui.tableWidget.item(element.row(), 0).text()
         valid_selection = False
-        with mutex:
+        
+        # Check whether the selection is valid (if its a directory or not)
+        with fileMutex:
             for file in self.files:
-                print(file.directory_flag, file.current_dir, new_dir)
                 if file.directory_flag == True and file.name == new_dir: 
                     valid_selection = True
                     break
         
         if not valid_selection:
-            print(new_dir, "Is not a valid selection")
             return
         
         self.dir_stack.append(new_dir)
         
-        self.refreshFiles()
+        # Since we are in a new directory, remove the current selection
+        self.current_selection = None
 
-        print(new_dir, "IN HERE")
+        self.refreshFiles()
     
     """ Go up to the next directory """
     def dirUp(self):
@@ -377,9 +424,13 @@ class Window(QMainWindow):
             return
 
         self.dir_stack.pop()
+        
+        # Since we are in a new directory, remove the current selection
+        self.current_selection = None
        
         self.refreshFiles()
 
+    """ Requests to create a new directory on the server """
     def createDirectory(self):
         text, ok = QInputDialog.getText(self, 
                                          "Directory Name", 
@@ -396,8 +447,8 @@ class Window(QMainWindow):
                 
             response = self.c_socket.recv(MAX_SIZE)
             if response.decode() != ResponseCode.READY:
-                msg.setText("There was an error on the server's side. " +
-                            "Please try again.")
+                msg.setText("There was an error on the server's side, " +
+                            "Please refresh and try again!")
                 msg.exec()
                 return
             
@@ -419,6 +470,7 @@ class Window(QMainWindow):
             msg.exec()
             self.refreshFiles()  
 
+    """ Selects files from the user and uploads them to the server """
     def selectFile(self):
         files = list()
 
@@ -449,6 +501,7 @@ class Window(QMainWindow):
         self.fetchServerFiles()
         self.fillTable()
             
+    """ Uploads the files selected from the user to the server """
     def uploadFiles(self, files):
         results = list()
         self.ui.stackedWidget.setEnabled(False)
@@ -496,14 +549,16 @@ class Window(QMainWindow):
 
         return results
 
-    def currentSelection(self, element):
-        self.current_selection = self.ui.tableWidget.item(element.row(), 0).text()
-        print(self.current_selection)
 
+    """ Lets the user know they are attempting to delete a directory """
     def directory_delete_confirmation(self, selection):
         if selection.text() == "OK":
             self.deleteFileOrDirectory()
 
+    """ 
+        Checks whether the user is deleting a file or directory 
+        and calls the corresponding function 
+    """
     def deleteFile(self):
         directory = False
         directory_confirmation = False 
@@ -511,7 +566,7 @@ class Window(QMainWindow):
             print("None Error") # TODO show screen
             return
 
-        with mutex:
+        with fileMutex:
             for file in self.files:
                 print(file.directory_flag, file.current_dir, self.current_selection)
                 if file.directory_flag == True and file.name == self.current_selection: 
@@ -531,17 +586,16 @@ class Window(QMainWindow):
         
         self.deleteFileOrDirectory() 
     
+    """ Deletes a file from the server """
     def deleteFileOrDirectory(self):
         self.c_socket.send(ResponseCode.DELETE_FILE.encode())
         
         response = self.c_socket.recv(MAX_SIZE)
+       
         if response.decode() != ResponseCode.READY:
-            print("SERVER NOT READY TO DELETE")
             return
 
         path = self.currentServerPath() + self.current_selection
-        
-        print(path)
         
         self.c_socket.send(path.encode())
 
@@ -556,6 +610,10 @@ class Window(QMainWindow):
         if response == ResponseCode.SUCCESS:
             msg.setText("Deletion Successfull!")
             msg.exec()
+        elif response == ResponseCode.EDITING:
+            msg.setText("There is someone currently editing this file, please wait " +
+                        "and try again.")
+            msg.exec()
         else:
             msg.setText("Error: file or directory could not be deleted, or " + 
                         "has already been deleted by another user.\nPlease " +
@@ -564,6 +622,7 @@ class Window(QMainWindow):
         
         self.refreshFiles()            
 
+    """ Downloads a file from the server """ 
     def downloadFile(self):
         files = list()
         msg = QMessageBox()
@@ -581,8 +640,8 @@ class Window(QMainWindow):
         response = self.c_socket.recv(MAX_SIZE)
         
         if response.decode() != ResponseCode.READY:
-            msg.setText("The file requested to download was not found on the " +
-                        "server. Please refresh and try again!")
+            msg.setText("There was an error on the server's side, " +
+                        "Please refresh and try again!")
             msg.exec()
             return 
 
@@ -597,16 +656,153 @@ class Window(QMainWindow):
         
         response = self.c_socket.recv(MAX_SIZE)
         
+        if response.decode() == ResponseCode.EDITING:
+            msg.setText("There is someone currently editing this file, please wait " +
+                        "and try again.")
+            msg.exec()
+            return
+
         if response.decode() != ResponseCode.SUCCESS:
-            msg.setText("There was an error on the server's side, please try again.")
+            msg.setText("There was an error on the server's side, " +
+                        "Please refresh and try again!")
             msg.exec()
             return
        
         # Let the server know we are ready to get the file
         self.c_socket.send(ResponseCode.READY.encode())
 
-        data = self.recieveFile(filename[0])
+        self.recieveFile(filename[0])
+
+
+    """ Edits a file from the server """ 
+    def editFile(self):
+        directory = False
         
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.setWindowTitle("Status")
+        
+        if self.current_selection is None:
+            msg.setText("Error: Please select a file to edit.")
+            msg.exec()
+            return 
+        
+        with fileMutex:
+            for file in self.files:
+                if file.directory_flag == True and file.name == self.current_selection: 
+                    directory = True
+                    break
+
+        if directory:
+            msg.setText("Error: Directory selected")
+            msg.exec()
+            return
+       
+        self.ui.stackedWidget.setCurrentIndex(EDIT_SCREEN)
+        
+        self.EDITING = True
+
+        edit_file = self.currentServerPath() + self.current_selection  
+        
+        self.c_socket.send(ResponseCode.EDIT_FILE.encode())
+        
+        response = self.c_socket.recv(MAX_SIZE)
+        
+        if response.decode() != ResponseCode.READY:
+            self.ui.stackedWidget.setCurrentIndex(MAIN_SCREEN)
+            msg.setText("There was an error on the server's side, " +
+                        "Please refresh and try again!")
+            msg.exec()
+            self.EDITING = False
+            return
+
+
+        self.c_socket.send(edit_file.encode())
+        
+        response = self.c_socket.recv(MAX_SIZE)
+        
+        if response.decode() == ResponseCode.DUPLICATE:
+            self.ui.stackedWidget.setCurrentIndex(MAIN_SCREEN)
+            msg.setText("There is someone currently editing this file, please wait " +
+                        "and try again.")
+            msg.exec() 
+            self.EDITING = False
+            return
+        
+        elif response.decode() == ResponseCode.ERROR:
+            self.ui.stackedWidget.setCurrentIndex(MAIN_SCREEN)
+            msg.setText("There was an error on the server's side, " +
+                        "Please refresh and try again!")
+            msg.exec()
+            self.EDITING = False
+            return
+        
+        elif response.decode() != ResponseCode.SUCCESS:
+            self.ui.stackedWidget.setCurrentIndex(MAIN_SCREEN)
+            msg.setText("There was an error on the server's side, " +
+                        "Please refresh and try again!")
+            msg.exec()
+            self.EDITING = False
+            return
+        
+        
+        self.c_socket.send(ResponseCode.READY.encode())
+        
+        # Create a temporary file so we can download the file using 
+        # previously defined methods.
+        tmp = tempfile.NamedTemporaryFile(delete = False)
+        try:
+            self.recieveFile(tmp.name)
+            tmp.seek(0)
+            self.ui.edit_file_name.setText(edit_file)
+            file = tmp.read().decode()
+            self.ui.file_contents_area.insertPlainText(file)
+
+        # Just in case the server accidentally sends us a binary file
+        except UnicodeDecodeError:
+            self.editCancel()
+        
+        finally:
+            tmp.close()
+            try:
+                os.unlink(tmp.name)
+            except Exception:
+                pass
+
+    """ Saves the file requested to be edited from the server (reuploads it) """ 
+    def editSave(self):
+        self.EDITING = False
+        
+        self.c_socket.send(ResponseCode.READY.encode())
+
+        text = self.ui.file_contents_area.toPlainText()
+        
+        file = text.encode()
+
+        self.c_socket.sendall(struct.pack("<Q", len(file)))
+        self.c_socket.sendall(file)
+        
+        self.ui.file_contents_area.clear()
+
+        self.ui.stackedWidget.setCurrentIndex(MAIN_SCREEN)
+
+        self.refreshFiles()
+
+
+    """ Cancels an edit request for a server file """ 
+    def editCancel(self):
+        self.EDITING = False
+        
+        self.c_socket.send(ResponseCode.ERROR.encode())
+        self.ui.file_contents_area.clear()
+        self.ui.stackedWidget.setCurrentIndex(MAIN_SCREEN)
+    
+        self.refreshFiles()
+
+
+
+
 app = QApplication([])
 
 window = Window()

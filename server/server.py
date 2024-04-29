@@ -16,11 +16,14 @@ MAX_USERS = 16
 
 SERVER_FILES = list()
 
+EDIT_STACK = list()
+
 SERVER_TERMINATE = False
 
 USER_COUNT = 0
 
 user_mutex = threading.Lock()
+edit_mutex = threading.Lock()
 refresh_mutex = threading.Lock()
 upload_mutex = threading.Lock()
 delete_mutex = threading.Lock()
@@ -115,18 +118,21 @@ def client_handler(c_socket):
                     with upload_mutex:
                         upload_file_to_server(c_socket)
 
-                case ResponseCode.CREATE_DIR:
-                    with refresh_mutex:
-                        create_directory(c_socket)
-
                 case ResponseCode.DOWNLOAD_FILE:
                     # A person can not delete a file that is trying to be dowloaded
                     with delete_mutex:
                         download_file(c_socket)
                 
+                case ResponseCode.EDIT_FILE:
+                    edit_file(c_socket)
+
                 case ResponseCode.DELETE_FILE:
                     with delete_mutex:
                         delete_file(c_socket)
+                
+                case ResponseCode.CREATE_DIR:
+                    with refresh_mutex:
+                        create_directory(c_socket)
 
                 case _:
                     stdoutPrint("An error has occured, %s is not a valid client request" 
@@ -326,6 +332,10 @@ def delete_file(c_socket):
         
     directory_path = Path(server_py_path + "/" + file_path)
    
+    if check_edit_stack( (server_py_path + "/" + file_path) ):
+        c_socket.send(ResponseCode.EDITING.encode())
+        return
+    
     # Directory case
     if os.path.isdir(directory_path):
         shutil.rmtree(directory_path)
@@ -353,6 +363,10 @@ def download_file(c_socket):
     
     path = server_py_path + "/" + file
     
+    if check_edit_stack(path):
+        c_socket.send(ResponseCode.EDITING.encode())
+        return
+    
     # Ensure the file has not been deleted already
     try:
         f = open(path, "rb")
@@ -372,7 +386,85 @@ def download_file(c_socket):
         c_socket.sendall(read_bytes)
 
 
+def check_edit_stack(entry):
+    with edit_mutex:
+        for file in EDIT_STACK:
+            if file == entry:
+                return True
+    
+    return False
 
+def add_to_edit_stack(entry):
+    global EDIT_STACK
+    with edit_mutex:
+        EDIT_STACK.append(entry)
+
+def remove_from_edit_stack(entry):
+    global EDIT_STACK
+    counter = 0
+    with edit_mutex:
+        for file in EDIT_STACK:
+            if file == entry:
+                del EDIT_STACK[counter]
+                return
+            counter += 1
+
+def edit_file(c_socket):
+    try:
+        c_socket.send(ResponseCode.READY.encode())
+        
+        response = c_socket.recv(MAX_SIZE)
+        file_name = response.decode()
+        
+
+        server_py_path = os.path.dirname(os.path.realpath(__file__)) 
+           
+        # We want the string version to add to the edit stack
+        file_path = server_py_path + "/" + file_name
+
+        if check_edit_stack(file_path):
+            c_socket.send(ResponseCode.DUPLICATE.encode())
+            return
+        
+        add_to_edit_stack(file_path)
+        try:
+            file = open(file_path, "rb")
+            textchars = bytearray({7,8,9,10,12,13,27} | set(range(0x20, 0x100)) - {0x7f})
+            is_binary_string = lambda bytes: bool(bytes.translate(None, textchars))
+            if is_binary_string(file.read(MAX_SIZE)):
+                raise FileNotFoundError
+        except FileNotFoundError:
+            c_socket.send(ResponseCode.ERROR.encode())
+            remove_from_edit_stack(file_path)
+            return 
+        
+        c_socket.send(ResponseCode.SUCCESS.encode())
+        
+        response = c_socket.recv(MAX_SIZE)
+        
+        if response.decode() != ResponseCode.READY:
+            remove_from_edit_stack(file_path)
+            return
+        
+        file = open(file_path, "rb")
+        c_socket.sendall(struct.pack("<Q", os.path.getsize(file_path)))
+        while read_bytes := file.read(MAX_SIZE):
+            c_socket.sendall(read_bytes)
+        file.close()
+
+        response = c_socket.recv(MAX_SIZE)
+        
+        # This means the user backed out from editing the file
+        if response.decode() != ResponseCode.READY:
+            remove_from_edit_stack(file_path)
+            return
+        
+        recieve_file(c_socket, file_path)
+
+        remove_from_edit_stack(file_path)
+    except Exception as e:
+        print(e)
+        stdoutPrint(e)
 
 # Start program by calling main()
 if __name__ == "__main__":

@@ -423,6 +423,8 @@ class Ui_MainWindow(object):
 
         self.file_contents_area = QTextEdit(self.page_3)
         self.file_contents_area.setObjectName(u"file_contents_area")
+        self.file_contents_area.setFont(font3)
+        self.file_contents_area.setTabStopDistance(20.000000000000000)
 
         self.verticalLayout_5.addWidget(self.file_contents_area)
 
@@ -514,8 +516,10 @@ class Ui_MainWindow(object):
 "hr { height: 1px; border-width: 0; }\n"
 "li.unchecked::marker { content: \"\\2610\"; }\n"
 "li.checked::marker { content: \"\\2612\"; }\n"
-"</style></head><body style=\" font-family:'Segoe UI'; font-size:9pt; font-weight:400; font-style:normal;\">\n"
-"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><br /></p></body></html>", None))
+"</style></head><body style=\" font-family:'Segoe UI'; font-size:12pt; font-weight:400; font-style:normal;\">\n"
+"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">This is a test</p>\n"
+"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">	tab</p>\n"
+"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">		doubletab</p></body></html>", None))
         self.cancel.setText(QCoreApplication.translate("MainWindow", u"Cancel", None))
         self.label_14.setText("")
         self.save.setText(QCoreApplication.translate("MainWindow", u"Save", None))

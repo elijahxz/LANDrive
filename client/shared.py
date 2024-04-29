@@ -33,10 +33,12 @@ class ResponseCode(StrEnum):
     CREATE_DIR       = "CreateDirectory"
     UPLOAD_FILE      = "TCPUploadFile"
     DOWNLOAD_FILE    = "TCPDownloadFile"
+    EDIT_FILE        = "TCPEditFile"
     DELETE_FILE      = "DeleteFile"
     DUPLICATE        = "Duplicate"
     SUCCESS          = "Success"
     ERROR            = "Error"
+    EDITING          = "FileInUse"
     READY            = "Ready"
 class FileInfo:
     def __init__(self):
