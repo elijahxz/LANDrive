@@ -15,6 +15,7 @@ from enum import StrEnum
 MAX_USERS = 16
 
 SERVER_FILES = list()
+DIRECTORIES = list()
 
 EDIT_STACK = list()
 
@@ -154,9 +155,9 @@ def client_handler(c_socket):
     Get an updated list of available files from the server
 """
 def getServerFiles():
-    global SERVER_FILES
+    global SERVER_FILES, DIRECTORIES
     file_list = list()
-    
+
     while not SERVER_TERMINATE: 
         with refresh_mutex:
             file_list = list()
@@ -186,6 +187,8 @@ def getServerFiles():
                     new_dir = FileInfo()
                     new_dir.update(relative_path, subdir, current_dir, t_stamp, size, True)
                     
+                    DIRECTORIES.append(subdir)
+
                     file_list.append(new_dir) 
             
             SERVER_FILES = file_list
@@ -306,8 +309,12 @@ def create_directory(c_socket):
     path = c_socket.recv(MAX_SIZE)
     server_py_path = os.path.dirname(os.path.realpath(__file__)) 
     directory_path = Path(server_py_path + "/" + path.decode())
-    print(directory_path)
-    stdoutPrint(directory_path)
+    
+    create_dir = os.path.basename(directory_path)
+    if create_dir in DIRECTORIES:
+        c_socket.send(ResponseCode.ERROR.encode())
+        return
+
     try:
         os.mkdir(directory_path)
         c_socket.send(ResponseCode.SUCCESS.encode()) 
@@ -359,6 +366,10 @@ def download_file(c_socket):
     file = c_socket.recv(MAX_SIZE)
     file = file.decode()
     
+    # This means the user clicked cancel when selecting a file to save to.
+    if file == ResponseCode.ERROR:
+        return
+
     server_py_path = os.path.dirname(os.path.realpath(__file__)) 
     
     path = server_py_path + "/" + file

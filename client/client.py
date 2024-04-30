@@ -393,12 +393,67 @@ class Window(QMainWindow):
                 self.ui.tableWidget.setItem(row, 1, two)         
                 self.ui.tableWidget.setItem(row, 2, three)
                 row += 1
-   
+    
+    
+    def checkIfDirectoryExists(self, directory):
+        self.refreshFiles()
+
+        valid_selection = False
+        with fileMutex:
+            for file in self.files:
+                if file.directory_flag == True and file.name == directory: 
+                    valid_selection = True
+                    break
+        if directory == BASE_DIR: 
+            valid_selection = True
+
+        return valid_selection
+    
+    def goToValidDirectory(self):
+        self.refreshFiles()
+
+        valid = False
+        while not valid:
+            self.dir_stack.pop()
+            dir_num = len(self.dir_stack) - 1
+            
+            if dir_num >= 0:
+                valid = self.checkIfDirectoryExists(self.dir_stack[dir_num])
+            # Base directory will always be valid
+            else:
+                valid = True
+
+        self.refreshFiles()
+
     """ Go down a directory """
     def dirDown(self, element):
-        new_dir = self.ui.tableWidget.item(element.row(), 0).text()
         valid_selection = False
         
+        # Since we are in a new directory, remove the current selection
+        self.current_selection = None
+        
+        new_dir = self.ui.tableWidget.item(element.row(), 0).text()
+                
+        # Check the directory we are in
+        dir_num = len(self.dir_stack) - 1
+        
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.setWindowTitle("Status")
+        
+        if dir_num >= 0:
+            # Check if the directory we are in is still valid
+            valid_dir = self.checkIfDirectoryExists(self.dir_stack[dir_num])
+            
+            if not valid_dir: 
+                msg.setText("This directory does not exist anymore, " +
+                            "backing up to a directory that exists")
+                
+                self.goToValidDirectory()
+                msg.exec()
+                return
+               
         # Check whether the selection is valid (if its a directory or not)
         with fileMutex:
             for file in self.files:
@@ -408,16 +463,27 @@ class Window(QMainWindow):
         
         if not valid_selection:
             return
+            
+        # Check if the directory we are in is still valid
+        valid_dir = self.checkIfDirectoryExists(self.dir_stack[dir_num])
+        
+        if not valid_dir: 
+            msg.setText("This directory does not exist anymore, " +
+                        "backing up to a directory that exists")
+            
+            self.goToValidDirectory()
+            msg.exec()
+            return 
         
         self.dir_stack.append(new_dir)
-        
-        # Since we are in a new directory, remove the current selection
-        self.current_selection = None
 
         self.refreshFiles()
     
     """ Go up to the next directory """
     def dirUp(self):
+        # Since we are in a new directory, remove the current selection
+        self.current_selection = None
+        
         directory = len(self.dir_stack) - 1
         
         if (directory <= 0):
@@ -425,9 +491,24 @@ class Window(QMainWindow):
 
         self.dir_stack.pop()
         
-        # Since we are in a new directory, remove the current selection
-        self.current_selection = None
-       
+        # Check the directory we are in
+        dir_num = len(self.dir_stack) - 1
+        
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.setWindowTitle("Status")
+        
+        # Check if the directory we are in is still valid
+        valid_dir = self.checkIfDirectoryExists(self.dir_stack[dir_num])
+        
+        if not valid_dir: 
+            msg.setText("This directory does not exist anymore, " +
+                        "backing up to a directory that exists")
+            self.goToValidDirectory()
+            msg.exec()
+            return 
+
         self.refreshFiles()
 
     """ Requests to create a new directory on the server """
@@ -443,6 +524,16 @@ class Window(QMainWindow):
         msg.setWindowTitle("Status")
         
         if ok:
+            # Check the directory we are in
+            dir_num = len(self.dir_stack) - 1
+            if dir_num >= 0:
+                if self.dir_stack[dir_num] == text:
+                    msg.setText("Error: can not create folder with same name " +
+                                "as parent folder. Please choose a different name " +
+                                "and try again")
+                    msg.exec()
+                    return
+
             self.c_socket.send(ResponseCode.CREATE_DIR.encode())
                 
             response = self.c_socket.recv(MAX_SIZE)
@@ -453,8 +544,6 @@ class Window(QMainWindow):
                 return
             
             path = self.currentServerPath() + text
-            
-            print(path)
 
             self.c_socket.send(path.encode())
             
@@ -465,7 +554,8 @@ class Window(QMainWindow):
             elif response.decode() == ResponseCode.DUPLICATE:
                 msg.setText("Error: Duplicate directory found!")
             else:
-                msg.setText("Error: Could not create directory.")
+                msg.setText("Error: Could not create directory.\nNote: unique directory " +
+                            "names are requred.")
             
             msg.exec()
             self.refreshFiles()  
@@ -652,6 +742,10 @@ class Window(QMainWindow):
         
         selected_file = self.currentServerPath() + self.current_selection
         
+        if filename[0] == "":
+            self.c_socket.send(ResponseCode.ERROR.encode())
+            return
+
         self.c_socket.send(selected_file.encode())
         
         response = self.c_socket.recv(MAX_SIZE)
