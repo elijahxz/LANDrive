@@ -53,9 +53,10 @@ How to run:
 
 
 How to exit the program: 
+    
     client.py: 
         Click the X in the top right corner of the program.
-
+    
     server.py:
         Unfortunately, CTRL + C will not exit the python program.
         
