@@ -1,12 +1,12 @@
 import json
 import os
+import pickle
 import shutil
 import socket
 import struct
 import sys
-import time
 import threading
-import pickle
+import time
 from pathlib import Path
 from shared import HOST, PORT, SERVER_ROOT_DIR, MAX_SIZE, ResponseCode, FileInfo
 from enum import StrEnum
@@ -156,11 +156,10 @@ def client_handler(c_socket):
 """
 def getServerFiles():
     global SERVER_FILES, DIRECTORIES
-    file_list = list()
-
     while not SERVER_TERMINATE: 
         with refresh_mutex:
             file_list = list()
+            dirs = list()
             # Gets the path of this file, server.py. 
             # FileDirectory/ should be at the same path 
             server_py_path = os.path.dirname(os.path.realpath(__file__)) 
@@ -187,12 +186,12 @@ def getServerFiles():
                     new_dir = FileInfo()
                     new_dir.update(relative_path, subdir, current_dir, t_stamp, size, True)
                     
-                    DIRECTORIES.append(subdir)
+                    dirs.append(subdir)
 
                     file_list.append(new_dir) 
             
             SERVER_FILES = file_list
-   
+            DIRECTORIES = dirs 
         # The corresponding thread will check and update the files 
         # Approx. every second (with mutex locking it may vary)
         time.sleep(1)

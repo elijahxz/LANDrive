@@ -1,5 +1,4 @@
 from enum import StrEnum
-from json import JSONEncoder
 """
 READ ME!!!!!!
 This file is shared between the client.py and server.py. 

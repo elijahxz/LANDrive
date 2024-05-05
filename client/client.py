@@ -1,11 +1,11 @@
-import os
 import json
-import time
+import os
 import pickle
 import socket
 import struct
 import sys
 import tempfile
+import time
 from datetime import datetime
 from threading import Lock
 
@@ -612,7 +612,6 @@ class Window(QMainWindow):
                 # Check for duplicate
                 response = self.c_socket.recv(MAX_SIZE)
                 if response.decode() == ResponseCode.DUPLICATE:
-                    print("Duplicate on serverside")
                     results.append(file + ": Error, duplicate!")
                     continue;
                 
@@ -658,7 +657,6 @@ class Window(QMainWindow):
 
         with fileMutex:
             for file in self.files:
-                print(file.directory_flag, file.current_dir, self.current_selection)
                 if file.directory_flag == True and file.name == self.current_selection: 
                     directory = True
                     break
@@ -715,6 +713,8 @@ class Window(QMainWindow):
     """ Downloads a file from the server """ 
     def downloadFile(self):
         files = list()
+        directory = False
+
         msg = QMessageBox()
         msg.setIcon(QMessageBox.Information)
         msg.setStandardButtons(QMessageBox.Ok)
@@ -725,6 +725,16 @@ class Window(QMainWindow):
             msg.exec()
             return
         
+        with fileMutex:
+            for file in self.files:
+                if file.directory_flag == True and file.name == self.current_selection: 
+                    directory = True
+                    break
+        
+        if directory:
+            return
+
+
         self.c_socket.send(ResponseCode.DOWNLOAD_FILE.encode())
 
         response = self.c_socket.recv(MAX_SIZE)
@@ -794,6 +804,8 @@ class Window(QMainWindow):
             return
        
         self.ui.stackedWidget.setCurrentIndex(EDIT_SCREEN)
+        
+        self.ui.file_contents_area.clear()
         
         self.EDITING = True
 
