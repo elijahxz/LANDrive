@@ -3,7 +3,7 @@ Welcome to my LANDrive project, I hope you enjoy it!
 This program uses Python and PySide6 to create a server with files that runs over localhost. 
 
 YouTube Video Link:
-    https://youtu.be/-B3MIx8TpZY
+    <here>
 
 Python Version:
     3.12.3
