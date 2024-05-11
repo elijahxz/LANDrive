@@ -315,15 +315,17 @@ class Window(QMainWindow):
     
     """ Gets the current version of the server files from the server """
     def fetchServerFiles(self):
-        self.c_socket.send(ResponseCode.REFRESH.encode())
-       
-        data = self.recieveData()
-
-        # We assume no error when pickling the file, but there 
-        # should be a try/catch block here...TODO for the future
+      
         with fileMutex:
-            self.files = pickle.loads(data)
+            self.c_socket.send(ResponseCode.REFRESH.encode())
        
+            data = self.recieveData()
+
+            # We assume no error when pickling the file, but there 
+            # should be a try/catch block here...TODO for the future
+            self.files = pickle.loads(data)
+      
+
         now = datetime.now()
 
         #date_string = now.strftime("%B %d, %Y %H:%M:%S")
@@ -577,7 +579,9 @@ class Window(QMainWindow):
             file_info = ""
             self.window = StatusWindow()
             self.window.setEnableWindow(self) 
-            results = self.uploadFiles(files)
+            
+            with fileMutex:
+                results = self.uploadFiles(files)
             
             self.window.show()
             self.window.updateScreen(file_info, True)
@@ -712,70 +716,70 @@ class Window(QMainWindow):
 
     """ Downloads a file from the server """ 
     def downloadFile(self):
-        files = list()
-        directory = False
-
-        msg = QMessageBox()
-        msg.setIcon(QMessageBox.Information)
-        msg.setStandardButtons(QMessageBox.Ok)
-        msg.setWindowTitle("Status")
-
-        if self.current_selection is None:
-            msg.setText("Please select a file to download!")
-            msg.exec()
-            return
-        
         with fileMutex:
+            files = list()
+            directory = False
+
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Information)
+            msg.setStandardButtons(QMessageBox.Ok)
+            msg.setWindowTitle("Status")
+
+            if self.current_selection is None:
+                msg.setText("Please select a file to download!")
+                msg.exec()
+                return
+            
             for file in self.files:
                 if file.directory_flag == True and file.name == self.current_selection: 
                     directory = True
                     break
-        
-        if directory:
-            return
+            
+            if directory:
+                return
 
 
-        self.c_socket.send(ResponseCode.DOWNLOAD_FILE.encode())
+            self.c_socket.send(ResponseCode.DOWNLOAD_FILE.encode())
 
-        response = self.c_socket.recv(MAX_SIZE)
-        
-        if response.decode() != ResponseCode.READY:
-            msg.setText("There was an error on the server's side, " +
-                        "Please refresh and try again!")
-            msg.exec()
-            return 
+            response = self.c_socket.recv(MAX_SIZE)
+            
+            if response.decode() != ResponseCode.READY:
+                msg.setText("There was an error on the server's side, " +
+                            "Please refresh and try again!")
+                msg.exec()
+                return 
 
-        # I believe this should work for MAC, but untested.
-        default_dir = os.path.expanduser("~/Documents" + "/" + self.current_selection)
-        
-        filename = QFileDialog().getSaveFileName(self, "Save File", default_dir) 
-        
-        selected_file = self.currentServerPath() + self.current_selection
-        
-        if filename[0] == "":
-            self.c_socket.send(ResponseCode.ERROR.encode())
-            return
+            # I believe this should work for MAC, but untested.
+            default_dir = os.path.expanduser("~/Documents" + "/" + self.current_selection)
+            
+            filename = QFileDialog().getSaveFileName(self, "Save File", default_dir) 
+            
+            selected_file = self.currentServerPath() + self.current_selection
+            
+            if filename[0] == "":
+                self.c_socket.send(ResponseCode.ERROR.encode())
+                return
 
-        self.c_socket.send(selected_file.encode())
-        
-        response = self.c_socket.recv(MAX_SIZE)
-        
-        if response.decode() == ResponseCode.EDITING:
-            msg.setText("There is someone currently editing this file, please wait " +
-                        "and try again.")
-            msg.exec()
-            return
+            self.c_socket.send(selected_file.encode())
+            
+            response = self.c_socket.recv(MAX_SIZE)
+            
+            if response.decode() == ResponseCode.EDITING:
+                msg.setText("There is someone currently editing this file, please wait " +
+                            "and try again.")
+                msg.exec()
+                return
 
-        if response.decode() != ResponseCode.SUCCESS:
-            msg.setText("There was an error on the server's side, " +
-                        "Please refresh and try again!")
-            msg.exec()
-            return
-       
-        # Let the server know we are ready to get the file
-        self.c_socket.send(ResponseCode.READY.encode())
+            if response.decode() != ResponseCode.SUCCESS:
+                msg.setText("There was an error on the server's side, " +
+                            "Please refresh and try again!")
+                msg.exec()
+                return
+           
+            # Let the server know we are ready to get the file
+            self.c_socket.send(ResponseCode.READY.encode())
 
-        self.recieveFile(filename[0])
+            self.recieveFile(filename[0])
 
 
     """ Edits a file from the server """ 
@@ -851,30 +855,31 @@ class Window(QMainWindow):
             msg.exec()
             self.EDITING = False
             return
-        
-        
-        self.c_socket.send(ResponseCode.READY.encode())
-        
-        # Create a temporary file so we can download the file using 
-        # previously defined methods.
-        tmp = tempfile.NamedTemporaryFile(delete = False)
-        try:
-            self.recieveFile(tmp.name)
-            tmp.seek(0)
-            self.ui.edit_file_name.setText(edit_file)
-            file = tmp.read().decode()
-            self.ui.file_contents_area.insertPlainText(file)
-
-        # Just in case the server accidentally sends us a binary file
-        except UnicodeDecodeError:
-            self.editCancel()
-        
-        finally:
-            tmp.close()
+       
+        # If we refresh the file list while downloading the files, there may be an error
+        with fileMutex:  
+            self.c_socket.send(ResponseCode.READY.encode())
+            
+            # Create a temporary file so we can download the file using 
+            # previously defined methods.
+            tmp = tempfile.NamedTemporaryFile(delete = False)
             try:
-                os.unlink(tmp.name)
-            except Exception:
-                pass
+                self.recieveFile(tmp.name)
+                tmp.seek(0)
+                self.ui.edit_file_name.setText(edit_file)
+                file = tmp.read().decode()
+                self.ui.file_contents_area.insertPlainText(file)
+
+            # Just in case the server accidentally sends us a binary file
+            except UnicodeDecodeError:
+                self.editCancel()
+            
+            finally:
+                tmp.close()
+                try:
+                    os.unlink(tmp.name)
+                except Exception:
+                    pass
 
     """ Saves the file requested to be edited from the server (reuploads it) """ 
     def editSave(self):

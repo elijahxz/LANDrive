@@ -443,7 +443,7 @@ def edit_file(c_socket):
             is_binary_string = lambda bytes: bool(bytes.translate(None, textchars))
             if is_binary_string(file.read(MAX_SIZE)):
                 raise FileNotFoundError
-        except FileNotFoundError:
+        except Exception:
             c_socket.send(ResponseCode.ERROR.encode())
             remove_from_edit_stack(file_path)
             return 
