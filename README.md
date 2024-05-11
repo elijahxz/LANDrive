@@ -1,20 +1,26 @@
-Welcome to my LANDrive project, I hope you enjoy it!
+# Welcome to LANDrive 🖥-🖥-🖥
 
-This program uses Python and PySide6 to create a server with files that runs over localhost. 
+This is a concurrent client server program that accomplishes file sharing and editing files between multiple users on a local system. It is also able to run on a LAN network using the IPv4 address of the local machine which is running the server. This is my biggest project thus far, and I created it for a college course, CSCI 3240: Introduction to Computer Systems. 
 
-YouTube Video Link:
-    <here>
+1. YouTube Video Link:
+    - https://youtu.be/-B3MIx8TpZY
+    - Updates since video:
+        * Editing files works properly. 
+        * LAN Network is available if you change the host name to the IPv4 address on the machine that is running the server.py program.
+        
+    
 
-Python Version:
-    3.12.3
+2. Python Version:
 
-Packages used: (pip install <package>) 
+   `3.12.3`
 
-      PySide6
+4. Packages used: 
+
+   `PySide6 (pip install PySide6)`
   
-  Standard libraries that should already be installed:
+6. Standard libraries that should already be installed:
   
-    datetime
+    `datetime
     enum
     json
     os
@@ -26,12 +32,12 @@ Packages used: (pip install <package>)
     sys
     tempfile
     threading
-    time
+    time`
 
 
-Zipped file tree:
+## File tree:
 
-    FinalProjectElijahAtkins/
+    LANDrive/
         client/
             __init__.py
             Upload.py
@@ -47,41 +53,46 @@ Zipped file tree:
             shared.py
             server.py
 
-How to run:
+## How to run:
 
-    1. Download the zip file to your local computer.
-    
-    2. Unzip the file in the desired directory.
+1. Clone the repository.
 
-    3. Ensure all the files are in the file tree noted above.
+2. Ensure all the files are in the file tree noted above.
     
-    4. Install PySide6 if you have not already (pip install PySide6).
+3. Install PySide6 if you have not already (pip install PySide6).
     
-    5. Run the server.py file in the server/ directory. 
+4. Run the server.py file in the server/ directory. 
     
-    6. Run multiple instances of the client.py file in the client/ directory.
+5. Run multiple instances of the client.py file in the client/ directory.
 
 
-How to exit the program: 
+## How to exit the program: 
     
-    client.py: 
-        Click the X in the top right corner of the program.
+1. client.py: 
+   - Click the X in the top right corner of the program.
     
-    server.py:
-        Unfortunately, CTRL + C will not exit the python program.
+2. server.py:
+    * Unfortunately, CTRL + C will not exit the python program.
         
-        Find the process id by doing ps -ef or by attempting to close the window.
-        Run kill <pid>. 
+    * Find the process id by doing ps -ef or by attempting to close the window.
+    * Run kill [pid]. 
 
-        If that does not work, go into your task manager and end the python task process.
+    * If that does not work, go into your task manager and end the python task process.
 
 
-Potential errors to note:
+## Potential errors to note:
 
-    1. Non-updated server files usually means you have to manually click refresh
+1. Non-updated server files usually means you have to manually click refresh.
     
-    2. Creating a directory must be unique. 
+2. Creating a directory must be unique. 
     
-    3. Spamming any buttons may cause the program and server to have issues. 
+3. Spamming any buttons may cause the program to have issues. 
     
-    4. Uploading an extremely large file is untested.
+4. Uploading an extremely large file is untested.
+
+5. Making changes in the shared.py file must be copied to the client/ and server/ directories
+
+6. Port 8504 might be in use.
+
+## Acknowledgements
+I would like to thank my professor, Dr. Sainju for his incredible teaching. Learning about client server programming was very challenging, but he was patient and made the content easy to understand. 
