@@ -9,7 +9,7 @@ import time
 from datetime import datetime
 from threading import Lock
 
-from shared import HOST, PORT, BASE_DIR, MAX_SIZE, ResponseCode, FileInfo
+from shared import BASE_DIR, MAX_SIZE, ResponseCode, FileInfo
 
 # Whew, thats alot.
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
@@ -47,7 +47,8 @@ EDIT_SCREEN = 2
 
 """
     This window is a popup that is displayed when a user
-    uploads files from their local machine
+    uploads files from their local machine or downloads a 
+    directory from the server
 """
 class StatusWindow(QWidget):
     def __init__(self):
@@ -56,6 +57,10 @@ class StatusWindow(QWidget):
         self.ui = Ui_Form()
         self.ui.setupUi(self)
         self.ui.closeBtn.clicked.connect(self.closeCustomEvent)
+
+    def downloadWindow(self):
+        self.setWindowTitle("Directory Download Status")
+        self.ui.label.setText("Download Status")
 
     def setEnableWindow(self, window):
         self.window = window
@@ -74,8 +79,10 @@ class StatusWindow(QWidget):
         event.accept()
         self.close()
 
+
 """ 
-   The window is a wrapper class for Ui_MainWindow so we can interact with it. 
+   The window is a wrapper class for Ui_MainWindow so we can interact with it.
+   This class is very long and holds all of the functionality for the UI
 """
 class Window(QMainWindow):
     def __init__(self, parent=None):
@@ -114,7 +121,8 @@ class Window(QMainWindow):
         action1.triggered.connect(self.changeTheme)
         action2 = self.context_menu.addAction("Exit Program")
         action2.triggered.connect(QApplication.quit)
-  
+ 
+
     """ Sets up all of the button functionality and click events """
     def setupUiFunctionality(self):
         self.ui.connect_button.clicked.connect(self.connectToServer)
@@ -130,10 +138,10 @@ class Window(QMainWindow):
         self.ui.delete_2.clicked.connect(self.deleteFile)
         self.ui.create_dir.clicked.connect(self.createDirectory)
         
-
         # Selecting a row calls an event handler
         self.ui.tableWidget.doubleClicked.connect(self.dirDown)
         self.ui.tableWidget.clicked.connect(self.currentSelection)
+
 
     """ Called when the GUI is closed """
     def closeEvent(self, event):
@@ -149,11 +157,13 @@ class Window(QMainWindow):
             self.c_socket.close()
         except Exception:
             pass
-    
+
+
     """ Used for right clicking on the mouse """
     def contextMenuEvent(self, e):
         self.context_menu.exec(e.globalPos())
-    
+
+
     """ Changes the theme of the app (called by a menuevent) """
     def changeTheme(self):
         counter = 0
@@ -173,16 +183,14 @@ class Window(QMainWindow):
 
         self.current_theme = self.THEMES[counter] 
         app.setStyle(self.current_theme)
-        return
+
 
     """
         Connect button event, trys to connect to the server
         NOTE: The time.sleep() functions just make the UI look
-              a little better ... since we are connecting to
-              localhost its super fast
+              a little better ...
     """
     def connectToServer(self):
-
         # We cant allow the user to spam the connect button,
         # or else the program will crash :)
         if self.CONNECTING:
@@ -196,13 +204,40 @@ class Window(QMainWindow):
         try:
             self.CONNECTING = True
 
+            # Get the user specified server name and port
+            server = self.ui.server_name.text()
+            port = self.ui.port_number.text()
+            
+            # Check validity
+            if server == "" or port == "" or not port.isdigit():
+                self.CONNECTING = False
+                self.ui.connect_label.setText("Invalid server or port, please try again")
+                self.ui.connect_label.repaint()
+                return
+            
+            # Convert to int
+            port = int(port)
+            
+            # Check port validity
+            if port <= 0 or port >= 65536:
+                self.CONNECTING = False
+                self.ui.connect_label.setText("Invalid port (1-65535), please try again")
+                self.ui.connect_label.repaint()
+                return
+
+            # localhost should be represented by 127.0.0.1 .... I think 
+            if server.lower() == "localhost":
+                server = "127.0.0.1"
+
             # Pass in a tuple to connect()
-            self.c_socket.connect((HOST, PORT))
+            self.c_socket.connect((server, port))
+
         except ConnectionRefusedError:
             self.ui.connect_label.setText("Error: Connection to server refused. " +
-                               "Please try again or check the server status")
+                               "Please check inputs and try again or check the server status")
             self.CONNECTING = False
             return
+
         self.CONNECTING = False
         self.ui.connect_label.setText("Success! Connected to the server!")
         self.ui.connect_label.repaint()
@@ -211,10 +246,12 @@ class Window(QMainWindow):
 
         self.displayMainScreen()
 
+
     """ If we try to disconnect while editing a file, let the server know """
     def disconnectFromServerWhileEditing(self):
         self.editCancel()
         self.disconnectFromServer()
+
 
     """ Disconnects from the server and shows the connect screen """
     def disconnectFromServer(self):
@@ -224,7 +261,8 @@ class Window(QMainWindow):
         self.c_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         self.displayConnectScreen()
-    
+
+
     """ Sets up the main screen to be displayed """
     def displayMainScreen(self):
         # Hide connection and show the main widget
@@ -238,17 +276,20 @@ class Window(QMainWindow):
 
         self.ui.stackedWidget.setCurrentIndex(MAIN_SCREEN)
 
+
     """ Shows the connect screen """
     def displayConnectScreen(self):
         self.ui.stackedWidget.setCurrentIndex(CONNECT_SCREEN)
     
+
     """ 
         Called when a table element is clicked
         This is stored in a variable for future functionality
     """
     def currentSelection(self, element):
         self.current_selection = self.ui.tableWidget.item(element.row(), 0).text()
-  
+ 
+
     """ Gets the relative path for the server directory that is shown on the screen """
     def currentServerPath(self):
         path = ""
@@ -257,12 +298,14 @@ class Window(QMainWindow):
         
         return path
 
+
     """ Refreshes the server's files """
     def refreshFiles(self):
         self.fetchServerFiles()
         self.fillTable()
 
-    """ Used to recieve a file, this gets the size of the file """
+
+    """ Used to recieve a file, this gets the struct that is sent before the actual file """
     def recieveDataSize(self):
         fmt = "<Q"
         expected_bytes = struct.calcsize(fmt)
@@ -277,7 +320,11 @@ class Window(QMainWindow):
         datasize = struct.unpack(fmt, stream)[0]
         return datasize
 
-    """ Recieves data from the server (used in self.fetchServerFiles) """
+
+    """ 
+        Recieves data from the server (used in self.fetchServerFiles) 
+        Similar to recieveFile.
+    """
     def recieveData(self):
         # First read from the socket the amount of
         # bytes that will be recieved from the server.
@@ -296,7 +343,11 @@ class Window(QMainWindow):
         
         return data
 
-    """ Recieves a file from the server and saves it to the specified filename """
+
+    """ 
+        Recieves a file from the server and saves it to the specified filename 
+        Similar to RecieveData.
+    """
     def recieveFile(self, filename):
         # First read from the socket the amount of
         # bytes that will be recieved from the file.
@@ -312,10 +363,12 @@ class Window(QMainWindow):
                 if chunk:
                     recieved_bytes += len(chunk)
                     f.write(chunk)
-    
+
+
     """ Gets the current version of the server files from the server """
     def fetchServerFiles(self):
-      
+     
+        # Lock down the file mutex so we can refresh
         with fileMutex:
             self.c_socket.send(ResponseCode.REFRESH.encode())
        
@@ -325,16 +378,16 @@ class Window(QMainWindow):
             # should be a try/catch block here...TODO for the future
             self.files = pickle.loads(data)
       
-
+        # Get the refresh time and display it
         now = datetime.now()
-
-        #date_string = now.strftime("%B %d, %Y %H:%M:%S")
         date_string = now.strftime("%H:%M:%S")
+        
         self.ui.updated.setText("Last Updated: " + date_string)
         self.ui.updated.repaint()
-
+        
+        # Request the number of users connected to the server
         self.c_socket.send(ResponseCode.USERS.encode())
-
+        
         data = self.c_socket.recv(MAX_SIZE)
         users = data.decode()
        
@@ -351,16 +404,24 @@ class Window(QMainWindow):
     def clearTable(self):
         while (self.ui.tableWidget.rowCount() > 0):
             self.ui.tableWidget.removeRow(0)
-    
+
+
     """ Fills the table that shows the files (used during refresh & traversal) """
     def fillTable(self):
         row = 0
         dir_files = list()
         
         self.clearTable()
+
+        # Update which directory we are in for every refresh
+        current_dir = self.dir_stack[ (len(self.dir_stack) - 1) ]
+        self.ui.dir_name.setText("Directory: " + current_dir)
+        self.ui.dir_name.repaint()
+
+        # Lock down the mutex and check which files are in the directory we are currently in
         with fileMutex:
             for file in self.files:
-                if file.current_dir == self.dir_stack[ ( len(self.dir_stack) - 1 ) ]:
+                if file.current_dir == current_dir:
                     dir_files.append(file)
        
         # No files in the directory
@@ -378,7 +439,8 @@ class Window(QMainWindow):
             self.ui.tableWidget.setItem(row, 0, one)         
             self.ui.tableWidget.setItem(row, 1, two)         
             self.ui.tableWidget.setItem(row, 2, three)
-
+        
+        # Display the files in the directory to the user
         else:
             self.ui.tableWidget.setRowCount(len(dir_files))
             for file in dir_files:
@@ -395,26 +457,35 @@ class Window(QMainWindow):
                 self.ui.tableWidget.setItem(row, 1, two)         
                 self.ui.tableWidget.setItem(row, 2, three)
                 row += 1
-    
-    
-    def checkIfDirectoryExists(self, directory):
-        self.refreshFiles()
 
+
+    """ Checks if directory passed in exists on the server """ 
+    def checkIfDirectoryExists(self, directory):
         valid_selection = False
+        
+        self.refreshFiles()
+        
         with fileMutex:
             for file in self.files:
                 if file.directory_flag == True and file.name == directory: 
                     valid_selection = True
                     break
+
         if directory == BASE_DIR: 
             valid_selection = True
 
         return valid_selection
-    
+
+
+    """ 
+        When another user deletes a directory that we are currently in, this
+        function takes us back to a directory that still exists.
+    """
     def goToValidDirectory(self):
+        valid = False
+        
         self.refreshFiles()
 
-        valid = False
         while not valid:
             self.dir_stack.pop()
             dir_num = len(self.dir_stack) - 1
@@ -424,8 +495,10 @@ class Window(QMainWindow):
             # Base directory will always be valid
             else:
                 valid = True
-
+        
+        # When we are in a valid directory, refresh the files and show them to the user
         self.refreshFiles()
+
 
     """ Go down a directory """
     def dirDown(self, element):
@@ -480,7 +553,8 @@ class Window(QMainWindow):
         self.dir_stack.append(new_dir)
 
         self.refreshFiles()
-    
+
+
     """ Go up to the next directory """
     def dirUp(self):
         # Since we are in a new directory, remove the current selection
@@ -512,6 +586,7 @@ class Window(QMainWindow):
             return 
 
         self.refreshFiles()
+
 
     """ Requests to create a new directory on the server """
     def createDirectory(self):
@@ -562,6 +637,7 @@ class Window(QMainWindow):
             msg.exec()
             self.refreshFiles()  
 
+
     """ Selects files from the user and uploads them to the server """
     def selectFile(self):
         files = list()
@@ -594,7 +670,8 @@ class Window(QMainWindow):
         # Update the files on the screen for the user
         self.fetchServerFiles()
         self.fillTable()
-            
+
+
     """ Uploads the files selected from the user to the server """
     def uploadFiles(self, files):
         results = list()
@@ -648,6 +725,7 @@ class Window(QMainWindow):
         if selection.text() == "OK":
             self.deleteFileOrDirectory()
 
+
     """ 
         Checks whether the user is deleting a file or directory 
         and calls the corresponding function 
@@ -677,7 +755,8 @@ class Window(QMainWindow):
             return
         
         self.deleteFileOrDirectory() 
-    
+
+
     """ Deletes a file from the server """
     def deleteFileOrDirectory(self):
         self.c_socket.send(ResponseCode.DELETE_FILE.encode())
@@ -714,6 +793,121 @@ class Window(QMainWindow):
         
         self.refreshFiles()            
 
+
+    """ Confirms if the user would like to download a directory """
+    def download_directory_confirmation(self, selection):
+        if selection.text() == "OK":
+            self.downloadDirectory()
+
+
+    """ 
+        Handles downloading a directory, and gives the user the status 
+        of the download when it is done
+    """
+    def downloadDirectory(self):
+        # I believe this should work for MAC, but untested.
+        default_dir = os.path.expanduser("~/Documents")
+        
+        # Dialog for the user to select a directory. Here they
+        # Should probably create a new directory to avoid errors.
+        user_dir_path = QFileDialog().getExistingDirectory(
+                                        self,  
+                                        "Save Directory", 
+                                        default_dir,
+                                        QFileDialog.ShowDirsOnly
+                                        )
+
+        # No directory selected, user exited the file dialog 
+        if user_dir_path == "":
+            return
+        
+        # Status window for when we are done dowloading
+        self.window = StatusWindow()
+        self.window.setEnableWindow(self) 
+        self.window.downloadWindow()
+        
+        selected_dir = self.current_selection
+
+        server_path = self.currentServerPath() + selected_dir
+        
+        file_info = self.downloadNestedDirectories(selected_dir, user_dir_path, server_path)
+        
+        # Show the download status of the files
+        self.window.show()
+        self.window.updateScreen(file_info, True)
+
+    
+    """
+        This function is the core for downloading directories. It is a recursive function
+        that will create a new folder for any nested directories and download all the files 
+        each specified directory. It goes all the way down to the leaves of the file directory tree. 
+    """
+    def downloadNestedDirectories(self, directory, user_dir_path, server_path):
+        dir_files = list()
+        nested_dirs = list()
+        
+        # fileMutex is locked from downloadFile 
+        # (call stack should look like downloadFile, 
+        #                              download_directory_confirmation, 
+        #                              downloadDirectory, 
+        #                              downloadNestedDirectories)
+        for file in self.files:
+            if file.current_dir == directory:
+                if file.directory_flag == True:
+                    nested_dirs.append(file)
+                else:
+                    dir_files.append(file)
+            
+        file_info = ""
+        
+        # Iterates through all of the current directories files and requests to download them.
+        for file in dir_files: 
+            file_path = user_dir_path + "/" + file.name        
+            selected_file = server_path + "/" + file.name
+            
+            self.c_socket.send(ResponseCode.DOWNLOAD_FILE.encode())
+
+            response = self.c_socket.recv(MAX_SIZE)
+            
+            if response.decode() != ResponseCode.READY:
+                file_info += selected_file + ": Server Error.\n\n"
+                continue
+
+            status = self.downloadFileFromServer(selected_file, file_path)
+            
+            if status == ResponseCode.EDITING:
+                file_info += selected_file + ": Error, someone currently editing.\n\n"
+                continue
+
+            elif status != ResponseCode.SUCCESS:
+                file_info += selected_file + ": Error.\n\n"
+                continue
+        
+            file_info += selected_file + ": Success!\n\n"
+        
+        # Recursively calls this function again if any subdirectories were found.
+        for n_dir in nested_dirs: 
+            new_server_path = server_path + "/" + n_dir.name
+            new_user_path = user_dir_path + "/" + n_dir.name
+            
+            try:
+                os.mkdir(new_user_path)
+                file_info += new_user_path + ": Created directory!\n\n"
+            except OSError as error:
+                if error is FileExistsError:
+                    file_info += new_user_path + ": Directory already exists!\n\n"
+                else:
+                    file_info += new_user_path + ": Error creating directory!\n\n"
+                continue
+            
+            info = self.downloadNestedDirectories(n_dir.name, new_user_path, new_server_path) 
+            
+            if info != None and info != "": 
+                file_info += info
+        
+        return file_info
+
+
     """ Downloads a file from the server """ 
     def downloadFile(self):
         with fileMutex:
@@ -734,10 +928,20 @@ class Window(QMainWindow):
                 if file.directory_flag == True and file.name == self.current_selection: 
                     directory = True
                     break
-            
+           
+            # Start of downloading a directory. 
             if directory:
+                msg = QMessageBox()
+                msg.setIcon(QMessageBox.Question)
+                msg.setText("This is a directory, are you sure you want to download all " + 
+                            "the files?\n\nNote: This process will overwrite any existing files " +
+                            "with the same name in the directory you select, so it is advised to " +
+                            "create a new directory for the download process.")
+                msg.setWindowTitle("Directory Selected!")
+                msg.setStandardButtons(QMessageBox.Ok | QMessageBox.Cancel)
+                msg.buttonClicked.connect(self.download_directory_confirmation)
+                msg.exec()
                 return
-
 
             self.c_socket.send(ResponseCode.DOWNLOAD_FILE.encode())
 
@@ -759,27 +963,42 @@ class Window(QMainWindow):
             if filename[0] == "":
                 self.c_socket.send(ResponseCode.ERROR.encode())
                 return
-
-            self.c_socket.send(selected_file.encode())
             
-            response = self.c_socket.recv(MAX_SIZE)
+            status = self.downloadFileFromServer(selected_file, filename[0])
             
-            if response.decode() == ResponseCode.EDITING:
+            if status == ResponseCode.EDITING:
                 msg.setText("There is someone currently editing this file, please wait " +
                             "and try again.")
                 msg.exec()
                 return
 
-            if response.decode() != ResponseCode.SUCCESS:
+            elif status != ResponseCode.SUCCESS:
                 msg.setText("There was an error on the server's side, " +
-                            "Please refresh and try again!")
+                        "Please refresh and try again!")
                 msg.exec()
                 return
-           
-            # Let the server know we are ready to get the file
-            self.c_socket.send(ResponseCode.READY.encode())
 
-            self.recieveFile(filename[0])
+            return
+
+
+    """
+        A user has the option to download whole directories, so this takes care of 
+        downloading a singular file. 
+    """
+    def downloadFileFromServer(self, selected_file, file):
+        self.c_socket.send(selected_file.encode())
+            
+        response = self.c_socket.recv(MAX_SIZE)
+        
+        if response.decode() != ResponseCode.SUCCESS:
+            return response.decode()
+       
+        # Let the server know we are ready to get the file
+        self.c_socket.send(ResponseCode.READY.encode())
+
+        self.recieveFile(file)
+
+        return ResponseCode.SUCCESS
 
 
     """ Edits a file from the server """ 
@@ -806,9 +1025,11 @@ class Window(QMainWindow):
             msg.setText("Error: Directory selected")
             msg.exec()
             return
-       
+        
+        # Show the edit screen
         self.ui.stackedWidget.setCurrentIndex(EDIT_SCREEN)
         
+        # Clear out any previous file that was edited
         self.ui.file_contents_area.clear()
         
         self.EDITING = True
@@ -856,7 +1077,7 @@ class Window(QMainWindow):
             self.EDITING = False
             return
        
-        # If we refresh the file list while downloading the files, there may be an error
+        # If we refresh the file list while downloading the file that is being edited, there may be an error
         with fileMutex:  
             self.c_socket.send(ResponseCode.READY.encode())
             
@@ -880,6 +1101,7 @@ class Window(QMainWindow):
                     os.unlink(tmp.name)
                 except Exception:
                     pass
+
 
     """ Saves the file requested to be edited from the server (reuploads it) """ 
     def editSave(self):
@@ -912,8 +1134,7 @@ class Window(QMainWindow):
         self.refreshFiles()
 
 
-
-
+# Start of the program :) ... just some PySide6 stuff to get the window opened.
 app = QApplication([])
 
 window = Window()

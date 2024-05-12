@@ -7,15 +7,12 @@ that is in the same directory as client.py AND server.py
 (Usually, they are not in the same directory, so BE CAREFUL)
 """
 
-# This app does not ask the client to insert a port,
-# so the server and client always tries to access
-# 8504 on localhost
-HOST = "127.0.0.1"
-PORT = 8504
 MAX_SIZE = 1024
 
 # Used on the server side to specify which directory to look in (needs \)
+# If you change this variable, there must be a matching file directory where server.py is located.
 SERVER_ROOT_DIR = "\\FileDirectory"
+
 # Used in client side to specify root directory of server (doesn't need \)
 BASE_DIR = SERVER_ROOT_DIR[1:]
 
@@ -39,6 +36,9 @@ class ResponseCode(StrEnum):
     ERROR            = "Error"
     EDITING          = "FileInUse"
     READY            = "Ready"
+
+# This class is what gets sent to the client from the server
+# When the client requests for a refresh. 
 class FileInfo:
     def __init__(self):
         self.rel_path = ""

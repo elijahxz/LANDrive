@@ -17,9 +17,9 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QPalette, QPixmap, QRadialGradient, QTransform)
 from PySide6.QtWidgets import (QAbstractItemView, QAbstractScrollArea, QApplication, QFrame,
     QHBoxLayout, QHeaderView, QLabel, QLayout,
-    QMainWindow, QPushButton, QSizePolicy, QSpacerItem,
-    QStackedWidget, QTableWidget, QTableWidgetItem, QTextEdit,
-    QVBoxLayout, QWidget)
+    QLineEdit, QMainWindow, QPushButton, QSizePolicy,
+    QSpacerItem, QStackedWidget, QTableWidget, QTableWidgetItem,
+    QTextEdit, QVBoxLayout, QWidget)
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -80,18 +80,58 @@ class Ui_MainWindow(object):
 
         self.verticalLayout.addItem(self.verticalSpacer)
 
-        self.connect_button = QPushButton(self.page)
-        self.connect_button.setObjectName(u"connect_button")
-        self.connect_button.setEnabled(True)
+        self.server_label = QLabel(self.page)
+        self.server_label.setObjectName(u"server_label")
         sizePolicy3 = QSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         sizePolicy3.setHorizontalStretch(0)
         sizePolicy3.setVerticalStretch(0)
+        sizePolicy3.setHeightForWidth(self.server_label.sizePolicy().hasHeightForWidth())
+        self.server_label.setSizePolicy(sizePolicy3)
+        self.server_label.setMinimumSize(QSize(300, 20))
+        self.server_label.setMaximumSize(QSize(300, 20))
+        font1 = QFont()
+        font1.setPointSize(16)
+        self.server_label.setFont(font1)
+
+        self.verticalLayout.addWidget(self.server_label, 0, Qt.AlignHCenter)
+
+        self.server_name = QLineEdit(self.page)
+        self.server_name.setObjectName(u"server_name")
+        sizePolicy3.setHeightForWidth(self.server_name.sizePolicy().hasHeightForWidth())
+        self.server_name.setSizePolicy(sizePolicy3)
+        self.server_name.setMinimumSize(QSize(300, 30))
+        font2 = QFont()
+        font2.setPointSize(12)
+        self.server_name.setFont(font2)
+        self.server_name.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignVCenter)
+
+        self.verticalLayout.addWidget(self.server_name, 0, Qt.AlignHCenter)
+
+        self.port_label = QLabel(self.page)
+        self.port_label.setObjectName(u"port_label")
+        self.port_label.setMinimumSize(QSize(300, 20))
+        self.port_label.setFont(font1)
+
+        self.verticalLayout.addWidget(self.port_label, 0, Qt.AlignHCenter)
+
+        self.port_number = QLineEdit(self.page)
+        self.port_number.setObjectName(u"port_number")
+        sizePolicy3.setHeightForWidth(self.port_number.sizePolicy().hasHeightForWidth())
+        self.port_number.setSizePolicy(sizePolicy3)
+        self.port_number.setMinimumSize(QSize(300, 30))
+        self.port_number.setFont(font2)
+
+        self.verticalLayout.addWidget(self.port_number, 0, Qt.AlignHCenter)
+
+        self.connect_button = QPushButton(self.page)
+        self.connect_button.setObjectName(u"connect_button")
+        self.connect_button.setEnabled(True)
         sizePolicy3.setHeightForWidth(self.connect_button.sizePolicy().hasHeightForWidth())
         self.connect_button.setSizePolicy(sizePolicy3)
         self.connect_button.setMinimumSize(QSize(300, 150))
-        font1 = QFont()
-        font1.setPointSize(26)
-        self.connect_button.setFont(font1)
+        font3 = QFont()
+        font3.setPointSize(26)
+        self.connect_button.setFont(font3)
 
         self.verticalLayout.addWidget(self.connect_button, 0, Qt.AlignHCenter)
 
@@ -106,9 +146,9 @@ class Ui_MainWindow(object):
         self.connect_label.setMinimumSize(QSize(400, 100))
         self.connect_label.setMaximumSize(QSize(400, 300))
         self.connect_label.setBaseSize(QSize(0, 0))
-        font2 = QFont()
-        font2.setPointSize(14)
-        self.connect_label.setFont(font2)
+        font4 = QFont()
+        font4.setPointSize(14)
+        self.connect_label.setFont(font4)
         self.connect_label.setAlignment(Qt.AlignLeading|Qt.AlignLeft|Qt.AlignVCenter)
         self.connect_label.setWordWrap(True)
 
@@ -145,9 +185,7 @@ class Ui_MainWindow(object):
         sizePolicy3.setHeightForWidth(self.disconnect_button.sizePolicy().hasHeightForWidth())
         self.disconnect_button.setSizePolicy(sizePolicy3)
         self.disconnect_button.setMinimumSize(QSize(100, 60))
-        font3 = QFont()
-        font3.setPointSize(12)
-        self.disconnect_button.setFont(font3)
+        self.disconnect_button.setFont(font2)
 
         self.horizontalLayout_6.addWidget(self.disconnect_button)
 
@@ -168,6 +206,7 @@ class Ui_MainWindow(object):
         sizePolicy3.setHeightForWidth(self.users.sizePolicy().hasHeightForWidth())
         self.users.setSizePolicy(sizePolicy3)
         self.users.setMinimumSize(QSize(100, 0))
+        self.users.setFont(font2)
         self.users.setAlignment(Qt.AlignCenter)
 
         self.horizontalLayout_6.addWidget(self.users)
@@ -190,7 +229,7 @@ class Ui_MainWindow(object):
         sizePolicy3.setHeightForWidth(self.back.sizePolicy().hasHeightForWidth())
         self.back.setSizePolicy(sizePolicy3)
         self.back.setMinimumSize(QSize(100, 60))
-        self.back.setFont(font3)
+        self.back.setFont(font2)
 
         self.horizontalLayout_4.addWidget(self.back)
 
@@ -201,9 +240,7 @@ class Ui_MainWindow(object):
         sizePolicy4.setVerticalStretch(0)
         sizePolicy4.setHeightForWidth(self.dir_name.sizePolicy().hasHeightForWidth())
         self.dir_name.setSizePolicy(sizePolicy4)
-        font4 = QFont()
-        font4.setPointSize(16)
-        self.dir_name.setFont(font4)
+        self.dir_name.setFont(font1)
         self.dir_name.setAlignment(Qt.AlignCenter)
 
         self.horizontalLayout_4.addWidget(self.dir_name)
@@ -225,15 +262,15 @@ class Ui_MainWindow(object):
             self.tableWidget.setColumnCount(3)
         __qtablewidgetitem = QTableWidgetItem()
         __qtablewidgetitem.setTextAlignment(Qt.AlignLeading|Qt.AlignVCenter);
-        __qtablewidgetitem.setFont(font3);
+        __qtablewidgetitem.setFont(font2);
         self.tableWidget.setHorizontalHeaderItem(0, __qtablewidgetitem)
         __qtablewidgetitem1 = QTableWidgetItem()
         __qtablewidgetitem1.setTextAlignment(Qt.AlignLeading|Qt.AlignVCenter);
-        __qtablewidgetitem1.setFont(font3);
+        __qtablewidgetitem1.setFont(font2);
         self.tableWidget.setHorizontalHeaderItem(1, __qtablewidgetitem1)
         __qtablewidgetitem2 = QTableWidgetItem()
         __qtablewidgetitem2.setTextAlignment(Qt.AlignLeading|Qt.AlignVCenter);
-        __qtablewidgetitem2.setFont(font3);
+        __qtablewidgetitem2.setFont(font2);
         self.tableWidget.setHorizontalHeaderItem(2, __qtablewidgetitem2)
         if (self.tableWidget.rowCount() < 21):
             self.tableWidget.setRowCount(21)
@@ -251,7 +288,7 @@ class Ui_MainWindow(object):
         self.tableWidget.setSizePolicy(sizePolicy5)
         self.tableWidget.setMinimumSize(QSize(0, 0))
         self.tableWidget.setMaximumSize(QSize(16777215, 16777215))
-        self.tableWidget.setFont(font3)
+        self.tableWidget.setFont(font2)
         self.tableWidget.setLayoutDirection(Qt.LeftToRight)
         self.tableWidget.setAutoFillBackground(False)
         self.tableWidget.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -288,7 +325,7 @@ class Ui_MainWindow(object):
         sizePolicy3.setHeightForWidth(self.refresh.sizePolicy().hasHeightForWidth())
         self.refresh.setSizePolicy(sizePolicy3)
         self.refresh.setMinimumSize(QSize(100, 60))
-        self.refresh.setFont(font3)
+        self.refresh.setFont(font2)
 
         self.horizontalLayout_5.addWidget(self.refresh)
 
@@ -297,7 +334,7 @@ class Ui_MainWindow(object):
         sizePolicy3.setHeightForWidth(self.upload.sizePolicy().hasHeightForWidth())
         self.upload.setSizePolicy(sizePolicy3)
         self.upload.setMinimumSize(QSize(100, 60))
-        self.upload.setFont(font3)
+        self.upload.setFont(font2)
 
         self.horizontalLayout_5.addWidget(self.upload)
 
@@ -306,7 +343,7 @@ class Ui_MainWindow(object):
         sizePolicy3.setHeightForWidth(self.create_dir.sizePolicy().hasHeightForWidth())
         self.create_dir.setSizePolicy(sizePolicy3)
         self.create_dir.setMinimumSize(QSize(100, 60))
-        self.create_dir.setFont(font3)
+        self.create_dir.setFont(font2)
 
         self.horizontalLayout_5.addWidget(self.create_dir)
 
@@ -322,7 +359,7 @@ class Ui_MainWindow(object):
         sizePolicy3.setHeightForWidth(self.delete_2.sizePolicy().hasHeightForWidth())
         self.delete_2.setSizePolicy(sizePolicy3)
         self.delete_2.setMinimumSize(QSize(100, 60))
-        self.delete_2.setFont(font3)
+        self.delete_2.setFont(font2)
 
         self.horizontalLayout_5.addWidget(self.delete_2)
 
@@ -331,7 +368,7 @@ class Ui_MainWindow(object):
         sizePolicy3.setHeightForWidth(self.download.sizePolicy().hasHeightForWidth())
         self.download.setSizePolicy(sizePolicy3)
         self.download.setMinimumSize(QSize(100, 60))
-        self.download.setFont(font3)
+        self.download.setFont(font2)
 
         self.horizontalLayout_5.addWidget(self.download)
 
@@ -340,7 +377,7 @@ class Ui_MainWindow(object):
         sizePolicy3.setHeightForWidth(self.edit.sizePolicy().hasHeightForWidth())
         self.edit.setSizePolicy(sizePolicy3)
         self.edit.setMinimumSize(QSize(100, 60))
-        self.edit.setFont(font3)
+        self.edit.setFont(font2)
 
         self.horizontalLayout_5.addWidget(self.edit)
 
@@ -384,7 +421,7 @@ class Ui_MainWindow(object):
         sizePolicy3.setHeightForWidth(self.disconnect_2.sizePolicy().hasHeightForWidth())
         self.disconnect_2.setSizePolicy(sizePolicy3)
         self.disconnect_2.setMinimumSize(QSize(100, 60))
-        self.disconnect_2.setFont(font3)
+        self.disconnect_2.setFont(font2)
 
         self.horizontalLayout_8.addWidget(self.disconnect_2)
 
@@ -423,7 +460,7 @@ class Ui_MainWindow(object):
 
         self.file_contents_area = QTextEdit(self.page_3)
         self.file_contents_area.setObjectName(u"file_contents_area")
-        self.file_contents_area.setFont(font3)
+        self.file_contents_area.setFont(font2)
         self.file_contents_area.setTabStopDistance(20.000000000000000)
 
         self.verticalLayout_5.addWidget(self.file_contents_area)
@@ -437,7 +474,7 @@ class Ui_MainWindow(object):
         sizePolicy3.setHeightForWidth(self.cancel.sizePolicy().hasHeightForWidth())
         self.cancel.setSizePolicy(sizePolicy3)
         self.cancel.setMinimumSize(QSize(100, 60))
-        self.cancel.setFont(font3)
+        self.cancel.setFont(font2)
 
         self.horizontalLayout_9.addWidget(self.cancel)
 
@@ -451,7 +488,7 @@ class Ui_MainWindow(object):
         sizePolicy3.setHeightForWidth(self.save.sizePolicy().hasHeightForWidth())
         self.save.setSizePolicy(sizePolicy3)
         self.save.setMinimumSize(QSize(100, 60))
-        self.save.setFont(font3)
+        self.save.setFont(font2)
 
         self.horizontalLayout_9.addWidget(self.save, 0, Qt.AlignRight)
 
@@ -479,14 +516,18 @@ class Ui_MainWindow(object):
 
     def retranslateUi(self, MainWindow):
         MainWindow.setWindowTitle(QCoreApplication.translate("MainWindow", u"LANDrive", None))
-        self.header.setText(QCoreApplication.translate("MainWindow", u"LANDrive", None))
+        self.header.setText(QCoreApplication.translate("MainWindow", u"Welcome to LANDrive!!!", None))
+        self.server_label.setText(QCoreApplication.translate("MainWindow", u"Server Name", None))
+        self.server_name.setText("")
+        self.port_label.setText(QCoreApplication.translate("MainWindow", u"Port", None))
+        self.port_number.setText("")
         self.connect_button.setText(QCoreApplication.translate("MainWindow", u"Connect", None))
         self.connect_label.setText("")
         self.disconnect_button.setText(QCoreApplication.translate("MainWindow", u"Disconnect", None))
         self.header_2.setText(QCoreApplication.translate("MainWindow", u"LANDrive", None))
         self.users.setText(QCoreApplication.translate("MainWindow", u"Users: ", None))
         self.back.setText(QCoreApplication.translate("MainWindow", u"Back", None))
-        self.dir_name.setText(QCoreApplication.translate("MainWindow", u"Directory", None))
+        self.dir_name.setText(QCoreApplication.translate("MainWindow", u"Directory:", None))
         self.updated.setText(QCoreApplication.translate("MainWindow", u"Last Updated:", None))
         ___qtablewidgetitem = self.tableWidget.horizontalHeaderItem(0)
         ___qtablewidgetitem.setText(QCoreApplication.translate("MainWindow", u"Name", None));

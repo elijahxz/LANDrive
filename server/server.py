@@ -1,6 +1,7 @@
 import json
 import os
 import pickle
+import signal
 import shutil
 import socket
 import struct
@@ -8,10 +9,22 @@ import sys
 import threading
 import time
 from pathlib import Path
-from shared import HOST, PORT, SERVER_ROOT_DIR, MAX_SIZE, ResponseCode, FileInfo
+from shared import SERVER_ROOT_DIR, MAX_SIZE, ResponseCode, FileInfo
 from enum import StrEnum
+ 
+""" 
+    To run on a LAN, change the HOST variable to your
+    IPv4 IP address that will host the server. 
+"""
+HOST = "127.0.0.1"
 
-# Max users for the server
+"""
+    If you run into an error starting the server, you 
+    can try changing the port. 
+"""
+PORT = 8504
+
+""" Max users for the server """
 MAX_USERS = 16
 
 SERVER_FILES = list()
@@ -32,7 +45,9 @@ delete_mutex = threading.Lock()
 def main():
     global SERVER_TERMINATE
     global USER_COUNT
+   
     stdoutPrint("Server running...\n")
+    
     # TCP socket
     s_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -61,7 +76,9 @@ def main():
             # This thread runs the client_handler function
             client_thread = threading.Thread(target=client_handler, args=(c_socket,))
             client_thread.start()
+    
     # When Ctrl + C, show that the server is closing
+    # TODO This does not work for some reason?
     except KeyboardInterrupt:
         stdoutPrint("Server shutting down...")
         
@@ -70,8 +87,9 @@ def main():
 
         s_socket.close()
         sys.exit()
-    
+
     return
+
 
 """ 
     I may be using threads and sockets wrong, because printing will 
@@ -80,6 +98,7 @@ def main():
 def stdoutPrint(message):
     print(message)
     sys.stdout.flush()
+
 
 """ Function to handle client connections """
 def client_handler(c_socket):
@@ -150,6 +169,7 @@ def client_handler(c_socket):
         # Assume there was an error with the socket, so this thread will be interupted and end
         with user_mutex:
             USER_COUNT -= 1
+
 
 """
     Get an updated list of available files from the server
@@ -228,6 +248,7 @@ def process_file_information(file_path, directory = False):
 
     return t_stamp, size
 
+
 """ 
     Handles the request to upload a file to the server.
 """
@@ -280,6 +301,7 @@ def recieve_file_size(c_socket):
     filesize = struct.unpack(fmt, stream)[0]
     return filesize
 
+
 """
     Recieves the file information from the client
 """
@@ -298,6 +320,7 @@ def recieve_file(c_socket, filename):
             if chunk:
                 recieved_bytes += len(chunk)
                 f.write(chunk)
+
 
 """
     Creates a directory on the server's side
@@ -356,6 +379,7 @@ def delete_file(c_socket):
     else:
         c_socket.send(ResponseCode.ERROR.encode())
 
+
 """
     Sends file data from the client to the server
 """
@@ -404,10 +428,12 @@ def check_edit_stack(entry):
     
     return False
 
+
 def add_to_edit_stack(entry):
     global EDIT_STACK
     with edit_mutex:
         EDIT_STACK.append(entry)
+
 
 def remove_from_edit_stack(entry):
     global EDIT_STACK
@@ -419,6 +445,7 @@ def remove_from_edit_stack(entry):
                 return
             counter += 1
 
+""" Sends a file to the client to edit, then waits for the client to exit or send back the file """
 def edit_file(c_socket):
     try:
         c_socket.send(ResponseCode.READY.encode())
@@ -473,7 +500,6 @@ def edit_file(c_socket):
 
         remove_from_edit_stack(file_path)
     except Exception as e:
-        print(e)
         stdoutPrint(e)
 
 # Start program by calling main()
