@@ -5,7 +5,6 @@ This is a concurrent client server program that accomplishes file sharing and ed
 1. YouTube Video Link:
     - https://www.youtube.com/watch?v=NWtlUMeE1_4
         
-
 2. Python Version:
 
    `3.12.3`
@@ -90,5 +89,19 @@ This is a concurrent client server program that accomplishes file sharing and ed
 
 6. Port 8504 might be in use.
 
+## Flaws
+1. Insecure
+2. Unfinished
+
 ## Acknowledgements
 I would like to thank my professor, Dr. Sainju for his incredible teaching. Learning about client server programming was very challenging, but he was patient and made the content easy to understand. 
+
+## Photos
+Connect Screen:
+![image](https://github.com/elijahxz/LANDrive/assets/98658210/e808a1b1-9dd3-4338-b192-e8314b2f91d8)
+Main Screen:
+![image](https://github.com/elijahxz/LANDrive/assets/98658210/5064f7ba-19ac-4096-b63e-cb7af87b0372)
+Edit Screen:
+![image](https://github.com/elijahxz/LANDrive/assets/98658210/53ff63a5-4c38-4982-a216-7aafb9c402c6)
+
+
