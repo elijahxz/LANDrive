@@ -3,12 +3,8 @@
 This is a concurrent client server program that accomplishes file sharing and editing files between multiple users on a local system. It is also able to run on a LAN network using the IPv4 address of the local machine which is running the server. This is my biggest project thus far, and I created it for a college course, CSCI 3240: Introduction to Computer Systems. 
 
 1. YouTube Video Link:
-    - https://youtu.be/-B3MIx8TpZY
-    - Updates since video:
-        * Editing files works properly. 
-        * LAN Network is available if you change the host name to the IPv4 address on the machine that is running the server.py program.
+    - https://www.youtube.com/watch?v=NWtlUMeE1_4
         
-    
 
 2. Python Version:
 
