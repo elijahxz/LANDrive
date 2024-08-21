@@ -1,6 +1,8 @@
 # Welcome to LANDrive 🖥-🖥-🖥
 
-This is a concurrent client server program that accomplishes file sharing and editing files between multiple users on a local system. It is also able to run on a LAN network using the IPv4 address of the local machine which is running the server. This is my biggest project thus far, and I created it for a college course, CSCI 3240: Introduction to Computer Systems. 
+This is a concurrent client server program that accomplishes file sharing and editing files between multiple users on a local system. It is also able to run on a LAN network using the IPv4 address of the local machine which is running the server. 
+
+I created this project for a college course, CSCI 3240: Introduction to Computer Systems.
 
 1. YouTube Video Link:
     - https://www.youtube.com/watch?v=NWtlUMeE1_4
