@@ -23,6 +23,7 @@ I created this project for a college course, CSCI 3240: Introduction to Computer
     os
     pathlib
     pickle
+    platformdirs
     socket
     shutil
     struct

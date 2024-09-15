@@ -1,5 +1,6 @@
 import json
 import os
+from pathlib import Path
 import pickle
 import socket
 import struct
@@ -8,6 +9,7 @@ import tempfile
 import time
 from datetime import datetime
 from threading import Lock
+import platformdirs
 
 from shared import BASE_DIR, MAX_SIZE, ResponseCode, FileInfo
 
@@ -87,6 +89,11 @@ class StatusWindow(QWidget):
 class Window(QMainWindow):
     def __init__(self, parent=None):
         super(Window, self).__init__(parent)
+       
+        # Used to save the last host inputted by the user
+        self.APPLICATIONDATA = None
+        self.LASTHOST = None
+
         # Used for connecting to the server 
         self.CONNECTING = False
        
@@ -106,6 +113,9 @@ class Window(QMainWindow):
         # Contains which file is selected by the user at any given time
         self.current_selection = None
 
+        # When CTRL is active, push files to this list
+        self.current_selection_list = list()
+
         # Create a socket for the client
         self.c_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -115,13 +125,56 @@ class Window(QMainWindow):
 
         self.setupUiFunctionality()
 
+        self.CTRL = False
+        
         # Setup the exit program & change theme option for the context menu
         self.context_menu = QMenu(self)
         action1 = self.context_menu.addAction("Change Theme")
         action1.triggered.connect(self.changeTheme)
         action2 = self.context_menu.addAction("Exit Program")
         action2.triggered.connect(QApplication.quit)
- 
+       
+        my_icon = QIcon()
+        my_icon.addFile('folder-icon.png')
+        self.setWindowIcon(my_icon)
+        
+        self.initiate_file()
+
+    def initiate_file(self): 
+        # Find the appropriate directory for storing app-specific data
+        app_name = "LANDrive"
+
+        # Get the user data directory in a cross-platform way
+        data_dir = platformdirs.user_data_dir(app_name)
+
+        # Ensure the directory exists
+        Path(data_dir).mkdir(parents=True, exist_ok=True)
+
+        # Define the path to the host file
+        hosts_file_path = os.path.join(data_dir, 'lasthost')
+        
+        self.APPLICATIONDATA = hosts_file_path
+
+        # Check if the 'hosts' file exists
+        if os.path.exists(hosts_file_path):
+            with open(hosts_file_path, 'r') as file:
+                server_name = file.readline().strip()
+                port = file.readline().strip()
+                self.ui.server_name.setText(server_name)
+                self.ui.port_number.setText(port)
+
+    """ Check if CTRL has been pressed """
+    def keyPressEvent(self, event):
+        if event.modifiers() == Qt.ControlModifier:
+            self.CTRL = True
+            print("START")
+            self.ui.tableWidget.setSelectionMode(QAbstractItemView.MultiSelection)
+
+    """ Check if CTRL has been released """
+    def keyReleaseEvent(self, event):
+        if event.modifiers() == Qt.KeyboardModifier.NoModifier:
+            self.CTRL = False
+            self.ui.tableWidget.setSelectionMode(QAbstractItemView.ExtendedSelection)
 
     """ Sets up all of the button functionality and click events """
     def setupUiFunctionality(self):
@@ -243,6 +296,10 @@ class Window(QMainWindow):
         self.ui.connect_label.repaint()
 
         time.sleep(2)
+        
+        with open(self.APPLICATIONDATA, 'w') as file:
+            file.write(server + "\n")
+            file.write(str(port) + "\n")
 
         self.displayMainScreen()
 
@@ -282,13 +339,43 @@ class Window(QMainWindow):
         self.ui.stackedWidget.setCurrentIndex(CONNECT_SCREEN)
     
 
+    def currentSelectionListProcess(self, func):
+        selections = self.current_selection_list
+        self.current_selection_list = list()
+        
+        for selection in selections:
+            self.current_selection = selection
+            func()
+        
+        self.current_selection = None
+
     """ 
         Called when a table element is clicked
         This is stored in a variable for future functionality
     """
     def currentSelection(self, element):
-        self.current_selection = self.ui.tableWidget.item(element.row(), 0).text()
- 
+        current_selection = self.ui.tableWidget.item(element.row(), 0).text()
+
+        # When a file is selected using ctrl, append it to this list
+        if self.CTRL:
+            # Check if the previous selected item is in the list. 
+            # This is required to make sense on the GUI
+            if self.current_selection is not None and not self.current_selection in self.current_selection_list:
+                self.current_selection_list.append(self.current_selection)
+
+            # Add current selection to the list
+            if not current_selection in self.current_selection_list:
+                self.current_selection_list.append(current_selection)
+            # If the user selects the same row again, it un-highlights it, 
+            # so remove it from the list
+            else:
+                self.current_selection_list.remove(current_selection)
+
+        else:
+            self.current_selection_list = list()
+        
+        self.current_selection = current_selection
+       
 
     """ Gets the relative path for the server directory that is shown on the screen """
     def currentServerPath(self):
@@ -731,6 +818,12 @@ class Window(QMainWindow):
         and calls the corresponding function 
     """
     def deleteFile(self):
+        
+        # If multiple files are selected, delete them all
+        if len(self.current_selection_list) != 0:
+            self.currentSelectionListProcess(self.deleteFile)
+            return
+        
         directory = False
         directory_confirmation = False 
         if self.current_selection == None:
@@ -910,6 +1003,12 @@ class Window(QMainWindow):
 
     """ Downloads a file from the server """ 
     def downloadFile(self):
+        
+        # If multiple files are selected, download them all
+        if len(self.current_selection_list) != 0:
+            self.currentSelectionListProcess(self.downloadFile)
+            return
+
         with fileMutex:
             files = list()
             directory = False
@@ -1010,6 +1109,13 @@ class Window(QMainWindow):
         msg.setStandardButtons(QMessageBox.Ok)
         msg.setWindowTitle("Status")
         
+        # If multiple files are selected, error
+        if len(self.current_selection_list) != 0:
+            msg.setText("Error: Please select a single file.")
+            msg.exec()
+            return
+       
+        # Case for no file selected
         if self.current_selection is None:
             msg.setText("Error: Please select a file to edit.")
             msg.exec()
