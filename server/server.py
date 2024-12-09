@@ -9,7 +9,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from shared import SERVER_ROOT_DIR, MAX_SIZE, ResponseCode, FileInfo
+from shared import *
 from enum import StrEnum
  
 """ 
@@ -36,6 +36,9 @@ SERVER_TERMINATE = False
 
 USER_COUNT = 0
 
+PRIVATE_KEY = None
+PUBLIC_KEY = None
+
 user_mutex = threading.Lock()
 edit_mutex = threading.Lock()
 refresh_mutex = threading.Lock()
@@ -45,7 +48,10 @@ delete_mutex = threading.Lock()
 def main():
     global SERVER_TERMINATE
     global USER_COUNT
-   
+    global PRIVATE_KEY
+    global PUBLIC_KEY
+    PUBLIC_KEY, PRIVATE_KEY = generate_rsa_keys()
+
     stdoutPrint("Server running...\n")
     
     # TCP socket
@@ -99,18 +105,41 @@ def stdoutPrint(message):
     print(message)
     sys.stdout.flush()
 
-
 """ Function to handle client connections """
 def client_handler(c_socket):
     global USER_COUNT
     try:
         files = list()
+        
+        # Get the client's public key and send out server public key
+        stdoutPrint("Sending Public Key")
+        send_key(c_socket, PUBLIC_KEY)
+        
+        stdoutPrint("Recieving Public Key")
+        c_public_key = recieve_key(c_socket)
+       
+        #data = recieve_data(c_socket)
+        send_data(c_socket, c_public_key, pickle.dumps(SERVER_FILES)) 
+        
+        #send_data(c_socket, c_public_key, ResponseCode.SUCCESS.encode())
+        
+        data = recieve_data(c_socket)
+        
+        if data.decode() != ResponseCode.SUCCESS: 
+            stdoutPrint("Error: Public Key Exchange Failed")
+            return
+        else:
+            stdoutPrint("Success: Public Key Exchange Completed")
 
         while True:
             # recieve data from the client
-            request = c_socket.recv(MAX_SIZE)
+            #request = c_socket.recv(MAX_SIZE)
+            stdoutPrint("Recieving Data From Client")
+            request = recieve_data(c_socket)
+            stdoutPrint("Recieved data!")
             
             buffer = request.decode()
+            stdoutPrint(buffer)
             
             match buffer:
                 # This breaks the while loop!
@@ -121,7 +150,7 @@ def client_handler(c_socket):
 
                 case ResponseCode.USERS:
                     with user_mutex:
-                        c_socket.send(str(USER_COUNT).encode())
+                        send_data(c_socket, c_public_key, str(USER_COUNT).encode())
 
                 # Send the files in the server's directory to the user
                 case ResponseCode.REFRESH:
@@ -129,30 +158,32 @@ def client_handler(c_socket):
                         sent = 0
                         data = pickle.dumps(SERVER_FILES)
                         
-                        stream = bytes(data)
-                        stream_length = len(stream)
-                        c_socket.sendall(struct.pack("<Q", stream_length))
-                        c_socket.sendall(stream)
+                        send_data(c_socket, c_public_key, data)
+
+                        #stream = bytes(data)
+                        #stream_length = len(stream)
+                        #c_socket.sendall(struct.pack("<Q", stream_length))
+                        #c_socket.sendall(stream)
 
                 case ResponseCode.UPLOAD_FILE:
                     with upload_mutex:
-                        upload_file_to_server(c_socket)
+                        upload_file_to_server(c_socket, c_public_key)
 
                 case ResponseCode.DOWNLOAD_FILE:
                     # A person can not delete a file that is trying to be dowloaded
                     with delete_mutex:
-                        download_file(c_socket)
+                        download_file(c_socket, c_public_key)
                 
                 case ResponseCode.EDIT_FILE:
-                    edit_file(c_socket)
+                    edit_file(c_socket, c_public_key)
 
                 case ResponseCode.DELETE_FILE:
                     with delete_mutex:
-                        delete_file(c_socket)
+                        delete_file(c_socket, c_public_key)
                 
                 case ResponseCode.CREATE_DIR:
                     with refresh_mutex:
-                        create_directory(c_socket)
+                        create_directory(c_socket, c_public_key)
 
                 case _:
                     stdoutPrint("An error has occured, %s is not a valid client request" 
@@ -252,13 +283,14 @@ def process_file_information(file_path, directory = False):
 """ 
     Handles the request to upload a file to the server.
 """
-def upload_file_to_server(c_socket):
+def upload_file_to_server(c_socket, c_public_key):
     done = False
     
     # Let the client know we are ready
-    c_socket.send(ResponseCode.READY.encode())
+    send_data(c_socket, c_public_key, ResponseCode.READY.encode())
 
-    file_path = c_socket.recv(MAX_SIZE)
+    #file_path = c_socket.recv(MAX_SIZE)
+    file_path = recieve_data(c_socket)
     file_path = file_path.decode() 
 
     server_py_path = os.path.dirname(os.path.realpath(__file__)) 
@@ -271,17 +303,17 @@ def upload_file_to_server(c_socket):
     
     try:
         file = open(directory_path, "rb")
-        c_socket.send(ResponseCode.DUPLICATE.encode())
+        send_data(c_socket, c_public_key, ResponseCode.DUPLICATE.encode())
         return
     except IOError:
         file = open(directory_path, "wb")
-        c_socket.send(ResponseCode.SUCCESS.encode())
+        send_data(c_socket, c_public_key, ResponseCode.SUCCESS.encode())
     
     stdoutPrint(directory_path)
     
     recieve_file(c_socket, directory_path)
     
-    c_socket.send(ResponseCode.SUCCESS.encode())
+    send_data(c_socket, c_public_key, ResponseCode.SUCCESS.encode())
 
 
 """
@@ -308,53 +340,58 @@ def recieve_file_size(c_socket):
 def recieve_file(c_socket, filename):
     # First read from the socket the amount of
     # bytes that will be recieved from the file.
-    filesize = recieve_file_size(c_socket)
+    #filesize = recieve_file_size(c_socket)
+    
+    file = recieve_data(c_socket)
+    
     # Open a new file where to store the recieved data.
     with open(filename, "wb") as f:
-        recieved_bytes = 0
+        #recieved_bytes = 0
         # recieve the file data in 1024-bytes chunks
         # until reaching the total amount of bytes
         # that was informed by the client.
-        while recieved_bytes < filesize:
-            chunk = c_socket.recv(MAX_SIZE)
-            if chunk:
-                recieved_bytes += len(chunk)
-                f.write(chunk)
+        #while recieved_bytes < filesize:
+        #    chunk = c_socket.recv(MAX_SIZE)
+        #    if chunk:
+        #        recieved_bytes += len(chunk)
+        f.write(file)
 
 
 """
     Creates a directory on the server's side
 """
-def create_directory(c_socket):
-    c_socket.send(ResponseCode.READY.encode())
+def create_directory(c_socket, c_public_key):
+    send_data(c_socket, c_public_key, ResponseCode.READY.encode())
     
-    path = c_socket.recv(MAX_SIZE)
+    #path = c_socket.recv(MAX_SIZE)
+    path = recieve_data(c_socket)
     server_py_path = os.path.dirname(os.path.realpath(__file__)) 
     directory_path = Path(server_py_path + "/" + path.decode())
     
     create_dir = os.path.basename(directory_path)
     if create_dir in DIRECTORIES:
-        c_socket.send(ResponseCode.ERROR.encode())
+        send_data(c_socket, c_public_key, ResponseCode.ERROR.encode())
         return
 
     try:
         os.mkdir(directory_path)
-        c_socket.send(ResponseCode.SUCCESS.encode()) 
+        send_data(c_socket, c_public_key, ResponseCode.SUCCESS.encode()) 
     except OSError as error:
         if error is FileExistsError:
-            c_socket.send(ResponseCode.DUPLICATE.encode())
+            send_data(c_socket, c_public_key, ResponseCode.DUPLICATE.encode())
         else:
-            c_socket.send(ResponseCode.ERROR.encode())
+            send_data(c_socket, c_public_key, ResponseCode.ERROR.encode())
         return
 
 
 """ 
     Deletes a file (or directory) on the server's side
 """
-def delete_file(c_socket):
-    c_socket.send(ResponseCode.READY.encode())
+def delete_file(c_socket, c_public_key):
+    send_data(c_socket, c_public_key, ResponseCode.READY.encode())
     
-    file_path = c_socket.recv(MAX_SIZE)
+    #file_path = c_socket.recv(MAX_SIZE)
+    file_path = recieve_data(c_socket)
     file_path = file_path.decode() 
     
     server_py_path = os.path.dirname(os.path.realpath(__file__)) 
@@ -362,31 +399,32 @@ def delete_file(c_socket):
     directory_path = Path(server_py_path + "/" + file_path)
    
     if check_edit_stack( (server_py_path + "/" + file_path) ):
-        c_socket.send(ResponseCode.EDITING.encode())
+        send_data(c_socket, c_public_key, ResponseCode.EDITING.encode())
         return
     
     # Directory case
     if os.path.isdir(directory_path):
         shutil.rmtree(directory_path)
-        c_socket.send(ResponseCode.SUCCESS.encode())
+        send_data(c_socket, c_public_key, ResponseCode.SUCCESS.encode())
     
     # File case
     elif os.path.isfile(directory_path):
         os.remove(directory_path)
-        c_socket.send(ResponseCode.SUCCESS.encode())
+        send_data(c_socket, c_public_key, ResponseCode.SUCCESS.encode())
    
     # DNE case (probably already deleted and user did not refresh)
     else:
-        c_socket.send(ResponseCode.ERROR.encode())
+        send_data(c_socket, c_public_key, ResponseCode.ERROR.encode())
 
 
 """
     Sends file data from the client to the server
 """
-def download_file(c_socket):
-    c_socket.send(ResponseCode.READY.encode())
+def download_file(c_socket, c_public_key):
+    send_data(c_socket, c_public_key, ResponseCode.READY.encode())
 
-    file = c_socket.recv(MAX_SIZE)
+    #file = c_socket.recv(MAX_SIZE)
+    file = recieve_data(c_socket)
     file = file.decode()
     
     # This means the user clicked cancel when selecting a file to save to.
@@ -398,27 +436,35 @@ def download_file(c_socket):
     path = server_py_path + "/" + file
     
     if check_edit_stack(path):
-        c_socket.send(ResponseCode.EDITING.encode())
+        send_data(c_socket, c_public_key, ResponseCode.EDITING.encode())
         return
     
     # Ensure the file has not been deleted already
     try:
         f = open(path, "rb")
     except FileNotFoundError:
-        c_socket.send(ResponseCode.ERROR.encode())
+        send_data(c_socket, c_public_key, ResponseCode.ERROR.encode())
         return 
    
-    c_socket.send(ResponseCode.SUCCESS.encode())
+    send_data(c_socket, c_public_key, ResponseCode.SUCCESS.encode())
     
-    response = c_socket.recv(MAX_SIZE)
+    #response = c_socket.recv(MAX_SIZE)
+    response = recieve_data(c_socket)
     
     if response.decode() != ResponseCode.READY:
         return
 
-    c_socket.sendall(struct.pack("<Q", os.path.getsize(path)))
-    while read_bytes := f.read(MAX_SIZE):
-        c_socket.sendall(read_bytes)
+    
 
+    #c_socket.sendall(struct.pack("<Q", os.path.getsize(path)))
+    #while read_bytes := f.read(MAX_SIZE):
+    #    c_socket.sendall(read_bytes)
+
+    file_contents = bytes()
+    while read_bytes := f.read(MAX_SIZE):
+        file_contents += read_bytes
+
+    send_data(c_socket, c_public_key, file_contents)
 
 def check_edit_stack(entry):
     with edit_mutex:
@@ -446,11 +492,12 @@ def remove_from_edit_stack(entry):
             counter += 1
 
 """ Sends a file to the client to edit, then waits for the client to exit or send back the file """
-def edit_file(c_socket):
+def edit_file(c_socket, c_public_key):
     try:
-        c_socket.send(ResponseCode.READY.encode())
+        send_data(c_socket, c_public_key, ResponseCode.READY.encode())
         
-        response = c_socket.recv(MAX_SIZE)
+        #response = c_socket.recv(MAX_SIZE)
+        response = recieve_data(c_socket)
         file_name = response.decode()
         
 
@@ -460,7 +507,7 @@ def edit_file(c_socket):
         file_path = server_py_path + "/" + file_name
 
         if check_edit_stack(file_path):
-            c_socket.send(ResponseCode.DUPLICATE.encode())
+            send_data(c_socket, c_public_key, ResponseCode.DUPLICATE.encode())
             return
         
         add_to_edit_stack(file_path)
@@ -471,31 +518,44 @@ def edit_file(c_socket):
             if is_binary_string(file.read(MAX_SIZE)):
                 raise FileNotFoundError
         except Exception:
-            c_socket.send(ResponseCode.ERROR.encode())
+            send_data(c_socket, c_public_key, ResponseCode.ERROR.encode())
             remove_from_edit_stack(file_path)
             return 
         
-        c_socket.send(ResponseCode.SUCCESS.encode())
+        send_data(c_socket, c_public_key, ResponseCode.SUCCESS.encode())
         
-        response = c_socket.recv(MAX_SIZE)
+        #response = c_socket.recv(MAX_SIZE)
+        response = recieve_data(c_socket)
         
         if response.decode() != ResponseCode.READY:
             remove_from_edit_stack(file_path)
             return
         
         file = open(file_path, "rb")
-        c_socket.sendall(struct.pack("<Q", os.path.getsize(file_path)))
+        
+        file_contents = bytes()
         while read_bytes := file.read(MAX_SIZE):
-            c_socket.sendall(read_bytes)
+            file_contents += read_bytes
+
+        send_data(c_socket, c_public_key, file_contents)
+
+       # c_socket.sendall(struct.pack("<Q", os.path.getsize(file_path)))
+       # while read_bytes := file.read(MAX_SIZE):
+       #     c_socket.sendall(read_bytes)
         file.close()
 
-        response = c_socket.recv(MAX_SIZE)
+        #response = c_socket.recv(MAX_SIZE)
+        response = recieve_data(c_socket)
         
         # This means the user backed out from editing the file
         if response.decode() != ResponseCode.READY:
+            stdoutPrint("Client not ready, so remove file")
             remove_from_edit_stack(file_path)
             return
-        
+       
+        send_data(c_socket, c_public_key, ResponseCode.READY.encode())
+
+        stdoutPrint("Attempting to recievefile")
         recieve_file(c_socket, file_path)
 
         remove_from_edit_stack(file_path)

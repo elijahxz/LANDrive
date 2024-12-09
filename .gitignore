@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# Private/Public Keys
+*.pem
+
 # C extensions
 *.so
 
