@@ -6,6 +6,8 @@ __pycache__/
 # Private/Public Keys
 *.pem
 
+# Vim temp files
+*.swp
 # C extensions
 *.so
 
