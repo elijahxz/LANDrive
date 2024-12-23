@@ -13,20 +13,10 @@ import platformdirs
 import struct
 from shared import *
 
-# Whew, thats alot.
-from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
-    QMetaObject, QObject, QPoint, QRect,
-    QSize, QTime, QUrl, Qt)
-from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
-    QFont, QFontDatabase, QGradient, QIcon,
-    QImage, QKeySequence, QLinearGradient, QPainter,
-    QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QAbstractItemView, QAbstractScrollArea, QApplication, QFrame,
-    QHBoxLayout, QHeaderView, QLabel, QLayout,
-    QMainWindow, QPushButton, QSizePolicy, QStackedWidget,
-    QTableWidget, QTableWidgetItem, QTextEdit, QVBoxLayout,
-    QWidget, QMenu, QStyleFactory, QFileDialog, QMessageBox, QInputDialog
-)
+# We use a TON from these libraries, so star imports
+from PySide6.QtCore import *
+from PySide6.QtGui import *
+from PySide6.QtWidgets import *
 
 """  
     Ui_Mainwindow is the barebones GUI I created in QT Developer
@@ -80,7 +70,6 @@ class StatusWindow(QWidget):
         self.window.ui.stackedWidget.setEnabled(True)
         event.accept()
         self.close()
-
 
 """ 
    The window is a wrapper class for Ui_MainWindow so we can interact with it.
@@ -301,17 +290,22 @@ class Window(QMainWindow):
             return
         
         # Get the server's public key and send out client public key.
-        print("Getting key", flush = True)
         self.S_PUBLIC_KEY = recieve_key(self.c_socket)
-        
         send_key(self.c_socket, self.PUBLIC_KEY)
-        
-        print("Done with key exchange!", flush = True) 
+       
         data = recieve_data(self.c_socket)
+        if data.decode() != ResponseCode.SUCCESS:
+            self.disconnectFromServerError("Error when communicating to server")
+            return
 
-        print("Sending Success Message!", flush = True) 
-        send_data(self.c_socket, self.S_PUBLIC_KEY, ResponseCode.SUCCESS.encode())
-        
+        # Send password to server
+        send_data(self.c_socket, self.S_PUBLIC_KEY, self.ui.password.text().encode())
+        data = recieve_data(self.c_socket)
+        if data.decode() != ResponseCode.SUCCESS:
+            self.disconnectFromServerError("Error during password validation, update password and try again.")
+            return
+       
+
         self.CONNECTING = False
         self.ui.connect_label.setText("Success! Connected to the server!")
         self.ui.connect_label.repaint()
@@ -321,8 +315,28 @@ class Window(QMainWindow):
         with open(self.APPLICATIONDATA, 'w') as file:
             file.write(server + "\n")
             file.write(str(port) + "\n")
+        
+        self.ui.password.setText("")
 
         self.displayMainScreen()
+    
+    """ When error occurs during server connection (ie: incorrect password) """
+    def disconnectFromServerError(self, message):
+        # Close socket
+        self.c_socket.close()
+        self.c_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.ui.connect_label.setText("")
+        
+        # Show error message
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Information)
+        msg.setStandardButtons(QMessageBox.Ok)
+        msg.setWindowTitle("Error: Could Not Connect To Server")
+        msg.setText(message)
+        msg.exec()
+       
+        # Do this last (button spam connect)
+        self.CONNECTING = False
 
 
     """ If we try to disconnect while editing a file, let the server know """
@@ -459,21 +473,10 @@ class Window(QMainWindow):
     def recieveFile(self, filename):
         # First read from the socket the amount of
         # bytes that will be recieved from the file.
-        #filesize = self.recieveDataSize()
-        
         file = recieve_data(self.c_socket)
         
         # Open a new file where to store the recieved data.
         with open(filename, "wb") as f:
-            #recieved_bytes = 0
-            # recieve the file data in 1024-bytes chunks
-            # until reaching the total amount of bytes
-            # that was informed by the client.
-            #while recieved_bytes < filesize:
-            #    chunk = self.c_socket.recv(MAX_SIZE)
-            #    if chunk:
-            #        recieved_bytes += len(chunk)
-            #        f.write(chunk)
             f.write(file)
 
     """ Gets the current version of the server files from the server """
@@ -482,7 +485,6 @@ class Window(QMainWindow):
         # Lock down the file mutex so we can refresh
         with fileMutex:
             send_data(self.c_socket, self.S_PUBLIC_KEY, ResponseCode.REFRESH.encode())
-            #data = self.recieveData()
             data = recieve_data(self.c_socket)
 
             # We assume no error when pickling the file, but there 
@@ -499,7 +501,6 @@ class Window(QMainWindow):
         # Request the number of users connected to the server
         send_data(self.c_socket, self.S_PUBLIC_KEY, ResponseCode.USERS.encode())
         
-        #data = self.c_socket.recv(MAX_SIZE)
         data = recieve_data(self.c_socket)
         
         users = data.decode()
@@ -726,7 +727,6 @@ class Window(QMainWindow):
 
             send_data(self.c_socket, self.S_PUBLIC_KEY, ResponseCode.CREATE_DIR.encode())
                 
-            #response = self.c_socket.recv(MAX_SIZE)
             response = recieve_data(self.c_socket)
             if response.decode() != ResponseCode.READY:
                 msg.setText("There was an error on the server's side, " +
@@ -738,7 +738,6 @@ class Window(QMainWindow):
 
             send_data(self.c_socket, self.S_PUBLIC_KEY, path.encode())
             
-            #response = self.c_socket.recv(MAX_SIZE)
             response = recieve_data(self.c_socket)
 
             if response.decode() == ResponseCode.SUCCESS:
@@ -772,80 +771,66 @@ class Window(QMainWindow):
             self.window.setEnableWindow(self) 
             
             with fileMutex:
-                results = self.uploadFiles(files)
-            
-            self.window.show()
-            self.window.updateScreen(file_info, True)
-            
-            for result in results: 
-                file_info += result+"\n\n"
-        
-            self.window.updateScreen(file_info, True)
-        
-        # Update the files on the screen for the user
-        self.fetchServerFiles()
-        self.fillTable()
-
+                self.uploadFiles(files)
 
     """ Uploads the files selected from the user to the server """
     def uploadFiles(self, files):
-        results = list()
         self.ui.stackedWidget.setEnabled(False)
+        results = list()
         try:
             for file in files:
                 send_data(self.c_socket, self.S_PUBLIC_KEY, ResponseCode.UPLOAD_FILE.encode())
-                
-                #response = self.c_socket.recv(MAX_SIZE)
+
                 response = recieve_data(self.c_socket)
                 if response.decode() != ResponseCode.READY:
                     results.append(file + ": Error")
                     continue
-                # Send the requested filepath to download the file at on 
+
+                # Send the requested filepath to download the file at on
                 # the server's side
                 path = self.currentServerPath() + os.path.basename(file)
-        
+
                 send_data(self.c_socket, self.S_PUBLIC_KEY, path.encode())
-                
+
                 # Check for duplicate
-                #response = self.c_socket.recv(MAX_SIZE)
                 response = recieve_data(self.c_socket)
                 if response.decode() == ResponseCode.DUPLICATE:
                     results.append(file + ": Error, duplicate!")
                     continue;
-                
+
                 filesize = os.path.getsize(file)
 
-                
-
-                #self.c_socket.sendall(struct.pack("<Q", filesize))
-
-                #with open(file, "rb") as f:
-                #    while read_bytes := f.read(1024):
-                #        self.c_socket.sendall(read_bytes)
-                
                 file_contents = bytes()
                 with open(file, "rb") as f:
-                    while read_bytes := f.read(1024):
-                        file_contents += read_bytes
-         
+                    file_contents = f.read()
+
                 send_data(self.c_socket, self.S_PUBLIC_KEY, file_contents)
 
-                #response = self.c_socket.recv(MAX_SIZE)
                 response = recieve_data(self.c_socket)
                 response = response.decode()
                 if response == ResponseCode.SUCCESS:
                     results.append(file + ": Success!")
-                    # do something
                 else:
                     results.append(file + ": Failure")
-                    # do something
 
         except IOError:
-            print("ERROR in uploadFiles!")
-            return results
+            results.append("ERROR in uploading the files to the server")
 
-        return results
 
+        self.window = StatusWindow()
+        self.window.setEnableWindow(self) 
+       
+        self.window.show()
+
+        file_info = ""
+        for result in results: 
+            file_info += result+"\n\n"
+        self.window.updateScreen(file_info, True)
+        
+        return
+
+    def uploadFileHandler(self):
+        print("Done!", flush = True)
 
     """ Lets the user know they are attempting to delete a directory """
     def directory_delete_confirmation(self, selection):
@@ -894,7 +879,6 @@ class Window(QMainWindow):
     def deleteFileOrDirectory(self):
         send_data(self.c_socket, self.S_PUBLIC_KEY, ResponseCode.DELETE_FILE.encode())
         
-        #response = self.c_socket.recv(MAX_SIZE)
         response = recieve_data(self.c_socket)
        
         if response.decode() != ResponseCode.READY:
@@ -904,7 +888,6 @@ class Window(QMainWindow):
         
         send_data(self.c_socket, self.S_PUBLIC_KEY, path.encode())
 
-        #response = self.c_socket.recv(MAX_SIZE)
         response = recieve_data(self.c_socket)
         response = response.decode()
        
@@ -1002,7 +985,6 @@ class Window(QMainWindow):
             
             send_data(self.c_socket, self.S_PUBLIC_KEY, ResponseCode.DOWNLOAD_FILE.encode())
 
-            #response = self.c_socket.recv(MAX_SIZE)
             response = recieve_data(self.c_socket)
             
             if response.decode() != ResponseCode.READY:
@@ -1087,7 +1069,6 @@ class Window(QMainWindow):
 
             send_data(self.c_socket, self.S_PUBLIC_KEY, ResponseCode.DOWNLOAD_FILE.encode())
 
-            #response = self.c_socket.recv(MAX_SIZE)
             response = recieve_data(self.c_socket)
             
             if response.decode() != ResponseCode.READY:
@@ -1131,7 +1112,6 @@ class Window(QMainWindow):
     def downloadFileFromServer(self, selected_file, file):
         send_data(self.c_socket, self.S_PUBLIC_KEY, selected_file.encode())
             
-        #response = self.c_socket.recv(MAX_SIZE)
         response = recieve_data(self.c_socket)
         
         if response.decode() != ResponseCode.SUCCESS:
@@ -1189,7 +1169,6 @@ class Window(QMainWindow):
         
         send_data(self.c_socket, self.S_PUBLIC_KEY, ResponseCode.EDIT_FILE.encode())
         
-        #response = self.c_socket.recv(MAX_SIZE)
         response = recieve_data(self.c_socket)
         
         if response.decode() != ResponseCode.READY:
@@ -1203,7 +1182,6 @@ class Window(QMainWindow):
 
         send_data(self.c_socket, self.S_PUBLIC_KEY, edit_file.encode())
         
-        #response = self.c_socket.recv(MAX_SIZE)
         response = recieve_data(self.c_socket)
         
         if response.decode() == ResponseCode.DUPLICATE:
@@ -1263,7 +1241,6 @@ class Window(QMainWindow):
         send_data(self.c_socket, self.S_PUBLIC_KEY, ResponseCode.READY.encode())
 
         response = recieve_data(self.c_socket)
-        print("Letting the server know that we are ready", flush = True)
         if response.decode() != ResponseCode.READY:
             return
 
@@ -1271,8 +1248,6 @@ class Window(QMainWindow):
         
         file = text.encode()
 
-        #self.c_socket.sendall(struct.pack("<Q", len(file)))
-        #self.c_socket.sendall(file)
         send_data(self.c_socket, self.S_PUBLIC_KEY, file)
 
         self.ui.file_contents_area.clear()

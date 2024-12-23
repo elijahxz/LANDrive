@@ -16,7 +16,8 @@ that is in the same directory as client.py AND server.py
 (Usually, they are not in the same directory, so BE CAREFUL)
 """
 
-MAX_SIZE = 1024
+# Set ~20mb. This helps with really large files
+MAX_SIZE = 20971520
 
 # Used on the server side to specify which directory to look in (needs \)
 # If you change this variable, there must be a matching file directory where server.py is located.

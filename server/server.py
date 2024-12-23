@@ -112,31 +112,26 @@ def client_handler(c_socket):
         files = list()
         
         # Get the client's public key and send out server public key
-        stdoutPrint("Sending Public Key")
         send_key(c_socket, PUBLIC_KEY)
         
-        stdoutPrint("Recieving Public Key")
         c_public_key = recieve_key(c_socket)
        
-        #data = recieve_data(c_socket)
-        send_data(c_socket, c_public_key, pickle.dumps(SERVER_FILES)) 
-        
-        #send_data(c_socket, c_public_key, ResponseCode.SUCCESS.encode())
+        send_data(c_socket, c_public_key, ResponseCode.SUCCESS.encode())
         
         data = recieve_data(c_socket)
+        password = data.decode().strip()
+        contents = ""
+        with open('password.pem', 'r') as file:
+            contents = file.read().strip() 
         
-        if data.decode() != ResponseCode.SUCCESS: 
-            stdoutPrint("Error: Public Key Exchange Failed")
+        if contents != "" and contents != password:
+            send_data(c_socket, c_public_key, ResponseCode.ERROR.encode())
             return
-        else:
-            stdoutPrint("Success: Public Key Exchange Completed")
+        
+        send_data(c_socket, c_public_key, ResponseCode.SUCCESS.encode())
 
         while True:
-            # recieve data from the client
-            #request = c_socket.recv(MAX_SIZE)
-            stdoutPrint("Recieving Data From Client")
             request = recieve_data(c_socket)
-            stdoutPrint("Recieved data!")
             
             buffer = request.decode()
             stdoutPrint(buffer)
@@ -159,11 +154,6 @@ def client_handler(c_socket):
                         data = pickle.dumps(SERVER_FILES)
                         
                         send_data(c_socket, c_public_key, data)
-
-                        #stream = bytes(data)
-                        #stream_length = len(stream)
-                        #c_socket.sendall(struct.pack("<Q", stream_length))
-                        #c_socket.sendall(stream)
 
                 case ResponseCode.UPLOAD_FILE:
                     with upload_mutex:
@@ -289,7 +279,6 @@ def upload_file_to_server(c_socket, c_public_key):
     # Let the client know we are ready
     send_data(c_socket, c_public_key, ResponseCode.READY.encode())
 
-    #file_path = c_socket.recv(MAX_SIZE)
     file_path = recieve_data(c_socket)
     file_path = file_path.decode() 
 
@@ -297,8 +286,6 @@ def upload_file_to_server(c_socket, c_public_key):
     
     directory_path = server_py_path + "/" + file_path
 
-    print(directory_path)
-    
     basename = os.path.basename(directory_path)
     
     try:
@@ -338,22 +325,10 @@ def recieve_file_size(c_socket):
     Recieves the file information from the client
 """
 def recieve_file(c_socket, filename):
-    # First read from the socket the amount of
-    # bytes that will be recieved from the file.
-    #filesize = recieve_file_size(c_socket)
-    
     file = recieve_data(c_socket)
     
     # Open a new file where to store the recieved data.
     with open(filename, "wb") as f:
-        #recieved_bytes = 0
-        # recieve the file data in 1024-bytes chunks
-        # until reaching the total amount of bytes
-        # that was informed by the client.
-        #while recieved_bytes < filesize:
-        #    chunk = c_socket.recv(MAX_SIZE)
-        #    if chunk:
-        #        recieved_bytes += len(chunk)
         f.write(file)
 
 
@@ -363,7 +338,6 @@ def recieve_file(c_socket, filename):
 def create_directory(c_socket, c_public_key):
     send_data(c_socket, c_public_key, ResponseCode.READY.encode())
     
-    #path = c_socket.recv(MAX_SIZE)
     path = recieve_data(c_socket)
     server_py_path = os.path.dirname(os.path.realpath(__file__)) 
     directory_path = Path(server_py_path + "/" + path.decode())
@@ -390,7 +364,6 @@ def create_directory(c_socket, c_public_key):
 def delete_file(c_socket, c_public_key):
     send_data(c_socket, c_public_key, ResponseCode.READY.encode())
     
-    #file_path = c_socket.recv(MAX_SIZE)
     file_path = recieve_data(c_socket)
     file_path = file_path.decode() 
     
@@ -423,7 +396,6 @@ def delete_file(c_socket, c_public_key):
 def download_file(c_socket, c_public_key):
     send_data(c_socket, c_public_key, ResponseCode.READY.encode())
 
-    #file = c_socket.recv(MAX_SIZE)
     file = recieve_data(c_socket)
     file = file.decode()
     
@@ -448,17 +420,10 @@ def download_file(c_socket, c_public_key):
    
     send_data(c_socket, c_public_key, ResponseCode.SUCCESS.encode())
     
-    #response = c_socket.recv(MAX_SIZE)
     response = recieve_data(c_socket)
     
     if response.decode() != ResponseCode.READY:
         return
-
-    
-
-    #c_socket.sendall(struct.pack("<Q", os.path.getsize(path)))
-    #while read_bytes := f.read(MAX_SIZE):
-    #    c_socket.sendall(read_bytes)
 
     file_contents = bytes()
     while read_bytes := f.read(MAX_SIZE):
@@ -496,7 +461,6 @@ def edit_file(c_socket, c_public_key):
     try:
         send_data(c_socket, c_public_key, ResponseCode.READY.encode())
         
-        #response = c_socket.recv(MAX_SIZE)
         response = recieve_data(c_socket)
         file_name = response.decode()
         
@@ -524,7 +488,6 @@ def edit_file(c_socket, c_public_key):
         
         send_data(c_socket, c_public_key, ResponseCode.SUCCESS.encode())
         
-        #response = c_socket.recv(MAX_SIZE)
         response = recieve_data(c_socket)
         
         if response.decode() != ResponseCode.READY:
@@ -539,12 +502,8 @@ def edit_file(c_socket, c_public_key):
 
         send_data(c_socket, c_public_key, file_contents)
 
-       # c_socket.sendall(struct.pack("<Q", os.path.getsize(file_path)))
-       # while read_bytes := file.read(MAX_SIZE):
-       #     c_socket.sendall(read_bytes)
         file.close()
 
-        #response = c_socket.recv(MAX_SIZE)
         response = recieve_data(c_socket)
         
         # This means the user backed out from editing the file

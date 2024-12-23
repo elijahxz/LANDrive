@@ -1,0 +1,3 @@
+1. Create a server GUI / Interface
+2. Allow multiple files to be downloaded using CTRL + Click
+3. Go through user interface and check for potential updates.

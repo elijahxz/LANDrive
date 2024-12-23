@@ -11,7 +11,9 @@ I created this project for a college course, CSCI 3240: Introduction to Computer
 2. Packages used: 
 
    `PySide6 (pip install PySide6)`
-  
+   `pycryptodome (pip install pycryptodome)`
+   `platformdirs (pip install platformdirs)`
+
 3. Standard libraries that should already be installed:
   
     `datetime

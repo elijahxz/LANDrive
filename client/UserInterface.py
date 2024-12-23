@@ -8,18 +8,9 @@
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
 
-from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
-    QMetaObject, QObject, QPoint, QRect,
-    QSize, QTime, QUrl, Qt)
-from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
-    QFont, QFontDatabase, QGradient, QIcon,
-    QImage, QKeySequence, QLinearGradient, QPainter,
-    QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QAbstractItemView, QAbstractScrollArea, QApplication, QFrame,
-    QHBoxLayout, QHeaderView, QLabel, QLayout,
-    QLineEdit, QMainWindow, QPushButton, QSizePolicy,
-    QSpacerItem, QStackedWidget, QTableWidget, QTableWidgetItem,
-    QTextEdit, QVBoxLayout, QWidget)
+from PySide6.QtCore import *  # type: ignore
+from PySide6.QtGui import *  # type: ignore
+from PySide6.QtWidgets import *  # type: ignore
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -122,6 +113,28 @@ class Ui_MainWindow(object):
         self.port_number.setFont(font2)
 
         self.verticalLayout.addWidget(self.port_number, 0, Qt.AlignHCenter)
+
+        self.label = QLabel(self.page)
+        self.label.setObjectName(u"label")
+        sizePolicy4 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        sizePolicy4.setHorizontalStretch(0)
+        sizePolicy4.setVerticalStretch(0)
+        sizePolicy4.setHeightForWidth(self.label.sizePolicy().hasHeightForWidth())
+        self.label.setSizePolicy(sizePolicy4)
+        self.label.setMinimumSize(QSize(300, 20))
+        self.label.setFont(font1)
+
+        self.verticalLayout.addWidget(self.label, 0, Qt.AlignHCenter)
+
+        self.password = QLineEdit(self.page)
+        self.password.setObjectName(u"password")
+        sizePolicy3.setHeightForWidth(self.password.sizePolicy().hasHeightForWidth())
+        self.password.setSizePolicy(sizePolicy3)
+        self.password.setMinimumSize(QSize(300, 30))
+        self.password.setFont(font2)
+        self.password.setEchoMode(QLineEdit.Password)
+
+        self.verticalLayout.addWidget(self.password, 0, Qt.AlignHCenter)
 
         self.connect_button = QPushButton(self.page)
         self.connect_button.setObjectName(u"connect_button")
@@ -235,11 +248,11 @@ class Ui_MainWindow(object):
 
         self.dir_name = QLabel(self.page_2)
         self.dir_name.setObjectName(u"dir_name")
-        sizePolicy4 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        sizePolicy4.setHorizontalStretch(0)
-        sizePolicy4.setVerticalStretch(0)
-        sizePolicy4.setHeightForWidth(self.dir_name.sizePolicy().hasHeightForWidth())
-        self.dir_name.setSizePolicy(sizePolicy4)
+        sizePolicy5 = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        sizePolicy5.setHorizontalStretch(0)
+        sizePolicy5.setVerticalStretch(0)
+        sizePolicy5.setHeightForWidth(self.dir_name.sizePolicy().hasHeightForWidth())
+        self.dir_name.setSizePolicy(sizePolicy5)
         self.dir_name.setFont(font1)
         self.dir_name.setAlignment(Qt.AlignCenter)
 
@@ -281,11 +294,11 @@ class Ui_MainWindow(object):
         __qtablewidgetitem5 = QTableWidgetItem()
         self.tableWidget.setItem(1, 1, __qtablewidgetitem5)
         self.tableWidget.setObjectName(u"tableWidget")
-        sizePolicy5 = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        sizePolicy5.setHorizontalStretch(100)
-        sizePolicy5.setVerticalStretch(0)
-        sizePolicy5.setHeightForWidth(self.tableWidget.sizePolicy().hasHeightForWidth())
-        self.tableWidget.setSizePolicy(sizePolicy5)
+        sizePolicy6 = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        sizePolicy6.setHorizontalStretch(100)
+        sizePolicy6.setVerticalStretch(0)
+        sizePolicy6.setHeightForWidth(self.tableWidget.sizePolicy().hasHeightForWidth())
+        self.tableWidget.setSizePolicy(sizePolicy6)
         self.tableWidget.setMinimumSize(QSize(0, 0))
         self.tableWidget.setMaximumSize(QSize(16777215, 16777215))
         self.tableWidget.setFont(font2)
@@ -305,7 +318,7 @@ class Ui_MainWindow(object):
         self.tableWidget.setCornerButtonEnabled(True)
         self.tableWidget.setRowCount(21)
         self.tableWidget.setColumnCount(3)
-        self.tableWidget.horizontalHeader().setVisible(True)
+        self.tableWidget.horizontalHeader().setVisible(False)
         self.tableWidget.horizontalHeader().setCascadingSectionResizes(True)
         self.tableWidget.horizontalHeader().setMinimumSectionSize(40)
         self.tableWidget.horizontalHeader().setDefaultSectionSize(300)
@@ -349,8 +362,8 @@ class Ui_MainWindow(object):
 
         self.label_9 = QLabel(self.page_2)
         self.label_9.setObjectName(u"label_9")
-        sizePolicy4.setHeightForWidth(self.label_9.sizePolicy().hasHeightForWidth())
-        self.label_9.setSizePolicy(sizePolicy4)
+        sizePolicy5.setHeightForWidth(self.label_9.sizePolicy().hasHeightForWidth())
+        self.label_9.setSizePolicy(sizePolicy5)
 
         self.horizontalLayout_5.addWidget(self.label_9)
 
@@ -521,6 +534,7 @@ class Ui_MainWindow(object):
         self.server_name.setText("")
         self.port_label.setText(QCoreApplication.translate("MainWindow", u"Port", None))
         self.port_number.setText("")
+        self.label.setText(QCoreApplication.translate("MainWindow", u"Password", None))
         self.connect_button.setText(QCoreApplication.translate("MainWindow", u"Connect", None))
         self.connect_label.setText("")
         self.disconnect_button.setText(QCoreApplication.translate("MainWindow", u"Disconnect", None))
@@ -552,15 +566,12 @@ class Ui_MainWindow(object):
         self.users_2.setText(QCoreApplication.translate("MainWindow", u"Users: ", None))
         self.edit_file_name.setText(QCoreApplication.translate("MainWindow", u"TextFile Name and other information here", None))
         self.file_contents_area.setHtml(QCoreApplication.translate("MainWindow", u"<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
-"<html><head><meta name=\"qrichtext\" content=\"1\" /><meta charset=\"utf-8\" /><style type=\"text/css\">\n"
+"<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
 "p, li { white-space: pre-wrap; }\n"
-"hr { height: 1px; border-width: 0; }\n"
-"li.unchecked::marker { content: \"\\2610\"; }\n"
-"li.checked::marker { content: \"\\2612\"; }\n"
-"</style></head><body style=\" font-family:'Segoe UI'; font-size:12pt; font-weight:400; font-style:normal;\">\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">This is a test</p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">	tab</p>\n"
-"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">		doubletab</p></body></html>", None))
+"</style></head><body style=\" font-family:'MS Shell Dlg 2'; font-size:12pt; font-weight:400; font-style:normal;\">\n"
+"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Segoe UI';\">This is a test</span></p>\n"
+"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Segoe UI';\">	tab</span></p>\n"
+"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\"><span style=\" font-family:'Segoe UI';\">		doubletab</span></p></body></html>", None))
         self.cancel.setText(QCoreApplication.translate("MainWindow", u"Cancel", None))
         self.label_14.setText("")
         self.save.setText(QCoreApplication.translate("MainWindow", u"Save", None))
