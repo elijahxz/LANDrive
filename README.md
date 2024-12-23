@@ -1,8 +1,6 @@
 # Welcome to LANDrive 🖥-🖥-🖥
 
-This is a concurrent client server program that accomplishes file sharing and editing files between multiple users on a local system. It is also able to run on a LAN network using the IPv4 address of the local machine which is running the server. 
-
-I created this project for a college course, CSCI 3240: Introduction to Computer Systems.
+This is a concurrent client server program that accomplishes file sharing and editing files between multiple users via TCP socket connections. 
         
 1. Python Version:
 
@@ -11,10 +9,12 @@ I created this project for a college course, CSCI 3240: Introduction to Computer
 2. Packages used: 
 
    `PySide6 (pip install PySide6)`
+   
    `pycryptodome (pip install pycryptodome)`
+   
    `platformdirs (pip install platformdirs)`
 
-3. Standard libraries that should already be installed:
+4. Standard libraries that should already be installed:
   
     `datetime
     enum
@@ -50,17 +50,27 @@ I created this project for a college course, CSCI 3240: Introduction to Computer
             shared.py
             server.py
 
-## How to run:
+## How to run without password protection:
 
 1. Clone the repository.
 
 2. Ensure all the files are in the file tree noted above.
     
-3. Install PySide6 if you have not already (pip install PySide6).
+3. Run the server.py file
+   * Must be done in the server/ directory!
     
-4. Run the server.py file in the server/ directory. 
-    
-5. Run multiple instances of the client.py file in the client/ directory.
+5. Run the client.py file
+   * Must be done in the client/ directory!
+   * Insert 127.0.0.1 or localhost into the Host
+   * Insert 8504 into the Port
+   * Leave the password field blank
+
+
+## How to run over LAN:
+1. In server/server.py change HOST to the LAN IPv4 on device (ipconfig)
+
+## How to run on a Rasberry PI
+1. Coming soon!!!
 
 
 ## How to exit the program: 
@@ -79,24 +89,24 @@ I created this project for a college course, CSCI 3240: Introduction to Computer
 
 ## Potential errors to note:
 
-1. Non-updated server files usually means you have to manually click refresh.
+1. Not multithreaded:
+   * Users manually have to refresh files.
+   * Uploading/Downloading large files will cause the GUI to pause. 
     
-2. Creating a directory must be unique. 
+3. Creating a directory must be unique. 
     
-3. Spamming any buttons may cause the program to have issues. 
-    
-4. Uploading an extremely large file is untested.
+4. Spamming any buttons may cause the program to have issues. 
 
 5. Making changes in the shared.py file must be copied to the client/ and server/ directories
 
 6. Port 8504 might be in use.
 
 ## Flaws
-1. Insecure
-2. Unfinished
+1. Unfinished
+2. Not multithreaded
 
 ## Acknowledgements
-I would like to thank my professor, Dr. Sainju for his incredible teaching. Learning about client server programming was very challenging, but he was patient and made the content easy to understand. 
+I would like to thank my professor, Dr. Sainju for his incredible teaching.
 
 ## Photos
 Connect Screen:
