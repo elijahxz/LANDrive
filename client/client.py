@@ -161,7 +161,6 @@ class Window(QMainWindow):
     def keyPressEvent(self, event):
         if event.modifiers() == Qt.ControlModifier:
             self.CTRL = True
-            print("START")
             self.ui.tableWidget.setSelectionMode(QAbstractItemView.MultiSelection)
 
     """ Check if CTRL has been released """
@@ -829,9 +828,6 @@ class Window(QMainWindow):
         
         return
 
-    def uploadFileHandler(self):
-        print("Done!", flush = True)
-
     """ Lets the user know they are attempting to delete a directory """
     def directory_delete_confirmation(self, selection):
         if selection.text() == "OK":
@@ -1249,11 +1245,14 @@ class Window(QMainWindow):
         file = text.encode()
 
         send_data(self.c_socket, self.S_PUBLIC_KEY, file)
+        
+        # To keep everything in sync
+        response = recieve_data(self.c_socket)
 
         self.ui.file_contents_area.clear()
 
         self.ui.stackedWidget.setCurrentIndex(MAIN_SCREEN)
-
+        
         self.refreshFiles()
 
 
@@ -1262,7 +1261,12 @@ class Window(QMainWindow):
         self.EDITING = False
         
         send_data(self.c_socket, self.S_PUBLIC_KEY, ResponseCode.ERROR.encode())
+        
+        # To keep everything in sync
+        response = recieve_data(self.c_socket)
+        
         self.ui.file_contents_area.clear()
+        
         self.ui.stackedWidget.setCurrentIndex(MAIN_SCREEN)
     
         self.refreshFiles()

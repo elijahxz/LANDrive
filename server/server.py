@@ -16,7 +16,7 @@ from enum import StrEnum
     To run on a LAN, change the HOST variable to your
     IPv4 IP address that will host the server. 
 """
-HOST = "172.20.10.2"
+HOST = "127.0.0.1"
 
 """
     If you run into an error starting the server, you 
