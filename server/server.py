@@ -16,7 +16,7 @@ from enum import StrEnum
     To run on a LAN, change the HOST variable to your
     IPv4 IP address that will host the server. 
 """
-HOST = "10.0.0.140"
+HOST = "172.20.10.2"
 
 """
     If you run into an error starting the server, you 
@@ -126,10 +126,8 @@ def client_handler(c_socket):
             return
         
         send_data(c_socket, c_public_key, ResponseCode.SUCCESS.encode())
-        
         with user_mutex:
             USER_COUNT += 1
-            
 
         while True:
             request = recieve_data(c_socket)
