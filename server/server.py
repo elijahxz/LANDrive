@@ -16,7 +16,7 @@ from enum import StrEnum
     To run on a LAN, change the HOST variable to your
     IPv4 IP address that will host the server. 
 """
-HOST = "127.0.0.1"
+HOST = "10.0.0.140"
 
 """
     If you run into an error starting the server, you 
@@ -53,7 +53,7 @@ def main():
     PUBLIC_KEY, PRIVATE_KEY = generate_rsa_keys()
 
     stdoutPrint("Server running...\n")
-    
+ 
     # TCP socket
     s_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -75,9 +75,6 @@ def main():
             stdoutPrint("Client connected, client's address = %s" % (c_address,))
             sys.stdout.flush()
            
-            with user_mutex:
-                USER_COUNT += 1
-            
             # Create a new thread to handle the client
             # This thread runs the client_handler function
             client_thread = threading.Thread(target=client_handler, args=(c_socket,))
@@ -129,12 +126,15 @@ def client_handler(c_socket):
             return
         
         send_data(c_socket, c_public_key, ResponseCode.SUCCESS.encode())
+        
+        with user_mutex:
+            USER_COUNT += 1
+            
 
         while True:
             request = recieve_data(c_socket)
             
             buffer = request.decode()
-            stdoutPrint(buffer)
             
             match buffer:
                 # This breaks the while loop!
@@ -179,7 +179,6 @@ def client_handler(c_socket):
                     stdoutPrint("An error has occured, %s is not a valid client request" 
                                 % (buffer))
              
-            stdoutPrint("Client message: %s" % (buffer))
             if (buffer == ResponseCode.CLOSE_CONNECTION):
                 break
             
@@ -296,8 +295,6 @@ def upload_file_to_server(c_socket, c_public_key):
         file = open(directory_path, "wb")
         send_data(c_socket, c_public_key, ResponseCode.SUCCESS.encode())
     
-    stdoutPrint(directory_path)
-    
     recieve_file(c_socket, directory_path)
     
     send_data(c_socket, c_public_key, ResponseCode.SUCCESS.encode())
@@ -328,9 +325,11 @@ def recieve_file(c_socket, filename):
     file = recieve_data(c_socket)
     
     # Open a new file where to store the recieved data.
-    with open(filename, "wb") as f:
-        f.write(file)
-
+    try:
+        with open(filename, "wb") as f:
+            f.write(file)
+    except Exception as e:
+        stdoutPrint(e)
 
 """
     Creates a directory on the server's side
@@ -463,13 +462,12 @@ def edit_file(c_socket, c_public_key):
         
         response = recieve_data(c_socket)
         file_name = response.decode()
-        
-
+    	
         server_py_path = os.path.dirname(os.path.realpath(__file__)) 
            
         # We want the string version to add to the edit stack
         file_path = server_py_path + "/" + file_name
-
+	
         if check_edit_stack(file_path):
             send_data(c_socket, c_public_key, ResponseCode.DUPLICATE.encode())
             return
@@ -508,14 +506,15 @@ def edit_file(c_socket, c_public_key):
         
         # This means the user backed out from editing the file
         if response.decode() != ResponseCode.READY:
-            stdoutPrint("Client not ready, so remove file")
+            send_data(c_socket, c_public_key, ResponseCode.READY.encode())
             remove_from_edit_stack(file_path)
             return
        
         send_data(c_socket, c_public_key, ResponseCode.READY.encode())
 
-        stdoutPrint("Attempting to recievefile")
         recieve_file(c_socket, file_path)
+        
+        send_data(c_socket, c_public_key, ResponseCode.READY.encode())
 
         remove_from_edit_stack(file_path)
     except Exception as e:
