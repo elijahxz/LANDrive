@@ -1,6 +1,6 @@
 # Welcome to LANDrive 🖥-🖥-🖥
 
-This is a concurrent client server program that accomplishes file sharing and editing files between multiple users via TCP socket connections. 
+This is a concurrent client server program that accomplishes file sharing and editing files between multiple users via TCP socket connections. It is encrypted using the RSA cryptosystem
 
 ## Photos
 Connect Screen:
